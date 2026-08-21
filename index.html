@@ -179,18 +179,17 @@
             }
         }
 
-        // PERBAIKAN 2: Paksa Canvas Menjadi Portrait Tegak
+        // KODE WATERMARK STYLED CARD (MENIRU CONTOH GAMBAR)
         function createStampedImage(desc, nama) {
             return new Promise((resolve) => {
                 const video = document.getElementById('webcam');
                 const canvas = document.getElementById('canvas');
                 const ctx = canvas.getContext('2d');
 
-                // Deteksi dimensi asli video
                 let vWidth = video.videoWidth || 1080;
                 let vHeight = video.videoHeight || 1920;
 
-                // Jika hardware menangkap gambar Landscape (Lebar > Tinggi), tukar nilainya agar Canvas jadi Portrait
+                // Memastikan Canvas Selalu Portrait Tegak
                 if (vWidth > vHeight) {
                     canvas.width = vHeight;
                     canvas.height = vWidth;
@@ -199,31 +198,120 @@
                     canvas.height = vHeight;
                 }
 
-                // Gambar frame video dengan posisi tegak
+                // 1. Render Foto Kamera
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-                // Buat Box Solid Putih di Bagian Bawah
-                const overlayHeight = Math.round(canvas.height * 0.16);
+                // 2. Dimensi & Posisi Kartu Watermark (Floating White Card)
+                const cardMargin = Math.round(canvas.width * 0.04);
+                const cardWidth = canvas.width - (cardMargin * 2);
+                const cardHeight = Math.round(canvas.height * 0.22);
+                const cardX = cardMargin;
+                const cardY = canvas.height - cardHeight - Math.round(canvas.height * 0.08);
+                const cornerRadius = Math.round(cardWidth * 0.05);
+
+                // Draw Rounded White Card
+                ctx.save();
                 ctx.fillStyle = "#ffffff";
-                ctx.fillRect(0, canvas.height - overlayHeight, canvas.width, overlayHeight);
+                ctx.shadowColor = "rgba(0, 0, 0, 0.3)";
+                ctx.shadowBlur = 15;
+                ctx.beginPath();
+                ctx.roundRect(cardX, cardY, cardWidth, cardHeight, cornerRadius);
+                ctx.fill();
+                ctx.restore();
 
-                // Render Teks Watermark
-                const fontSize = Math.round(canvas.height * 0.028);
-                ctx.fillStyle = "#1e293b"; 
-                ctx.font = `bold ${fontSize}px sans-serif`;
+                // 3. Render Peta Mini (Dummy Map Style)
+                const mapMargin = Math.round(cardWidth * 0.04);
+                const mapSize = Math.round(cardHeight * 0.42);
+                const mapX = cardX + mapMargin;
+                const mapY = cardY + mapMargin;
+
+                // Background Map
+                ctx.fillStyle = "#e5e7eb";
+                ctx.beginPath();
+                ctx.roundRect(mapX, mapY, mapSize, mapSize, Math.round(mapSize * 0.2));
+                ctx.fill();
+
+                // Garis-garis Jalanan di Peta Mini
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = Math.round(mapSize * 0.1);
+                ctx.beginPath();
+                ctx.moveTo(mapX, mapY + mapSize * 0.5);
+                ctx.lineTo(mapX + mapSize, mapY + mapSize * 0.5);
+                ctx.moveTo(mapX + mapSize * 0.5, mapY);
+                ctx.lineTo(mapX + mapSize * 0.5, mapY + mapSize);
+                ctx.stroke();
+
+                // Pin Lokasi Merah
+                ctx.fillStyle = "#ef4444";
+                ctx.beginPath();
+                ctx.arc(mapX + mapSize * 0.5, mapY + mapSize * 0.4, mapSize * 0.15, 0, Math.PI * 2);
+                ctx.fill();
+
+                // 4. Teks Informasi Lokasi & Koordinat
+                const textX = mapX + mapSize + Math.round(cardWidth * 0.04);
+                let currentY = mapY + Math.round(mapSize * 0.25);
+                const fontSizeMain = Math.round(cardHeight * 0.09);
+
+                // Nama Alamat / Tempat
+                ctx.fillStyle = "#0f172a";
+                ctx.font = `bold ${fontSizeMain}px sans-serif`;
                 ctx.textBaseline = "top";
+                ctx.fillText(currentAddress.substring(0, 32), textX, currentY);
 
-                const paddingX = Math.round(canvas.width * 0.05);
-                const startY = canvas.height - overlayHeight + (overlayHeight * 0.15);
-                const lineSpacing = Math.round(fontSize * 1.45);
+                // Koordinat Lat & Long
+                currentY += Math.round(fontSizeMain * 1.4);
+                const fontSizeSub = Math.round(cardHeight * 0.07);
+                ctx.fillStyle = "#64748b";
+                ctx.font = `${fontSizeSub}px sans-serif`;
+                const coordsText = currentCoords ? `Lat: ${currentCoords.split(',')[0]}, Long: ${currentCoords.split(',')[1]}` : "Lat: -6.9666, Long: 110.4166";
+                ctx.fillText(coordsText, textX, currentY);
 
+                // 5. Garis Pembatas Horisontal
+                const dividerY = mapY + mapSize + Math.round(cardHeight * 0.06);
+                ctx.strokeStyle = "#f1f5f9";
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(cardX + mapMargin, dividerY);
+                ctx.lineTo(cardX + cardWidth - mapMargin, dividerY);
+                ctx.stroke();
+
+                // 6. Bagian Bawah: Jam, Tanggal & Kompas (2 Kolom)
                 const now = new Date();
                 const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
-                const dateStr = now.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+                const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit', weekday: 'short' });
 
-                ctx.fillText(`👤 Nama: ${nama.toUpperCase()}`, paddingX, startY);
-                ctx.fillText(`📍 Lokasi: ${currentAddress.substring(0, 42)}`, paddingX, startY + lineSpacing);
-                ctx.fillText(`⏰ Waktu: ${timeStr} | ${dateStr}`, paddingX, startY + (lineSpacing * 2));
+                const col1X = cardX + mapMargin;
+                const col2X = cardX + (cardWidth / 2) + Math.round(mapMargin * 0.5);
+                const bottomY = dividerY + Math.round(cardHeight * 0.06);
+
+                // Kolom 1: Ikon Jam (Blue Circle) & Waktu
+                ctx.fillStyle = "#2563eb";
+                ctx.beginPath();
+                ctx.arc(col1X + Math.round(fontSizeMain * 0.7), bottomY + Math.round(fontSizeMain * 0.7), Math.round(fontSizeMain * 0.6), 0, Math.PI * 2);
+                ctx.fill();
+
+                // Teks Jam & Tanggal
+                ctx.fillStyle = "#1e40af";
+                ctx.font = `bold ${Math.round(fontSizeMain * 1.1)}px sans-serif`;
+                ctx.fillText(timeStr, col1X + Math.round(fontSizeMain * 1.8), bottomY);
+
+                ctx.fillStyle = "#64748b";
+                ctx.font = `${Math.round(fontSizeSub * 0.85)}px sans-serif`;
+                ctx.fillText(dateStr, col1X + Math.round(fontSizeMain * 1.8), bottomY + Math.round(fontSizeMain * 1.3));
+
+                // Kolom 2: Ikon Kompas & Arah Mata Angin
+                ctx.fillStyle = "#2563eb";
+                ctx.beginPath();
+                ctx.arc(col2X + Math.round(fontSizeMain * 0.7), bottomY + Math.round(fontSizeMain * 0.7), Math.round(fontSizeMain * 0.6), 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = "#1e40af";
+                ctx.font = `bold ${Math.round(fontSizeMain * 1.1)}px sans-serif`;
+                ctx.fillText("337°", col2X + Math.round(fontSizeMain * 1.8), bottomY);
+
+                ctx.fillStyle = "#64748b";
+                ctx.font = `${Math.round(fontSizeSub * 0.85)}px sans-serif`;
+                ctx.fillText("NorthEast", col2X + Math.round(fontSizeMain * 1.8), bottomY + Math.round(fontSizeMain * 1.3));
 
                 resolve(canvas.toDataURL('image/jpeg', 0.9));
             });
