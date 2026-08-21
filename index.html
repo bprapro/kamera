@@ -1,288 +1,373 @@
 <!DOCTYPE html>
 <html lang="id">
 <head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title>Kamera Dokumentasi Pekerjaan</title>
-  <!-- Tailwind CSS CDN -->
-  <script src="https://cdn.tailwindcss.com"></script>
-  <style>
-    .stamp-border {
-      box-shadow: 0 4px 6px -1px rgba(0, 0, 0, 0.1);
-    }
-  </style>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <title>WorkCam Doc v2.0</title>
+    <!-- Tailwind CSS CDN -->
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        body { background-color: #0a0e17; color: #e0e6ed; -webkit-font-smoothing: antialiased; }
+        .cyber-panel { background: rgba(20, 26, 38, 0.75); backdrop-filter: blur(10px); border: 1px solid rgba(56, 189, 248, 0.2); }
+        .cyber-border { border-color: rgba(56, 189, 248, 0.3); }
+        .text-glow { text-shadow: 0 0 8px rgba(56, 189, 248, 0.6); }
+        .bg-glow { box-shadow: 0 0 15px rgba(56, 189, 248, 0.2); }
+        .tab-active { color: #38bdf8; position: relative; }
+        .tab-active::after { content: ''; position: absolute; bottom: -1px; left: 0; width: 100%; height: 2px; background-color: #38bdf8; box-shadow: 0 0 8px #38bdf8; }
+        .animate-scan { position: absolute; top: 0; left: 0; width: 100%; height: 2px; background: linear-gradient(90deg, transparent, #38bdf8, transparent); animation: scan 2s linear infinite; }
+        @keyframes scan { 0% { top: 0; } 100% { top: 100%; } }
+        input, textarea, button { -webkit-appearance: none; border-radius: 0; }
+        ::-webkit-scrollbar { width: 5px; }
+        ::-webkit-scrollbar-thumb { background: #38bdf8; border-radius: 5px; }
+    </style>
 </head>
-<body class="bg-slate-100 text-slate-800 font-sans min-h-screen pb-10">
+<body class="font-sans flex flex-col h-screen">
 
-  <!-- Header Navigation -->
-  <header class="bg-slate-900 text-white p-4 shadow-md sticky top-0 z-50 flex justify-between items-center">
-    <h1 class="font-bold text-lg">Dokumentasi Kerja</h1>
-    <div class="flex gap-2">
-      <button id="btn-tab-camera" onclick="switchTab('camera')" class="px-3 py-1 text-sm bg-blue-600 rounded-lg font-semibold">Kamera</button>
-      <button id="btn-tab-gallery" onclick="switchTab('gallery')" class="px-3 py-1 text-sm bg-slate-700 rounded-lg font-semibold">Galeri</button>
+    <!-- Header / Navbar -->
+    <header class="cyber-panel px-4 py-3 shadow-lg z-50 fixed top-0 left-0 right-0">
+        <div class="flex items-center justify-between">
+            <div class="flex items-center gap-2">
+                <div class="w-2 h-6 bg-blue-500 rounded bg-glow"></div>
+                <h1 class="font-bold text-xl tracking-tight text-glow">Work<span class="text-blue-400">Cam</span> Doc</h1>
+            </div>
+            <div class="flex gap-1">
+                <button onclick="toggleModal('profil')" class="p-2 rounded-lg hover:bg-white/5 border cyber-border text-slate-400">👤</button>
+            </div>
+        </div>
+        <div class="flex border-b cyber-border mt-3 text-sm">
+            <button id="nav-camera" onclick="switchTab('camera')" class="w-1/2 text-center py-2 tab-active text-slate-300 font-medium">KAMERA</button>
+            <button id="nav-gallery" onclick="switchTab('gallery')" class="w-1/2 text-center py-2 text-slate-500 font-medium">GALERI</button>
+        </div>
+    </header>
+
+    <!-- Main Content -->
+    <main class="flex-grow pt-[110px] pb-[80px] px-4 overflow-y-auto">
+
+        <!-- TAB KAMERA -->
+        <section id="tab-camera" class="max-w-md mx-auto space-y-4">
+            <div class="relative bg-black rounded-3xl overflow-hidden shadow-2xl bg-glow aspect-[3/4] cyber-border">
+                <video id="webcam" autoplay playsinline class="w-full h-full object-cover"></video>
+                <canvas id="canvas" class="hidden"></canvas>
+                <div class="animate-scan"></div>
+                <div class="absolute bottom-4 left-4 right-4 flex items-center justify-between px-3 py-2 cyber-panel rounded-full text-xs text-blue-300">
+                    <span id="ui-timestamp">...</span>
+                    <span id="ui-location">Mencari GPS...</span>
+                </div>
+            </div>
+
+            <div class="cyber-panel p-5 rounded-3xl space-y-3">
+                <label class="text-[11px] font-bold text-blue-400 uppercase tracking-widest text-glow">Keterangan Pekerjaan</label>
+                <textarea id="input-desc" rows="3" placeholder="Masukkan detail pekerjaan yang akan distempel ke foto..." class="w-full p-4 bg-white/5 border cyber-border rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-600 text-white"></textarea>
+            </div>
+        </section>
+
+        <!-- TAB GALERI -->
+        <section id="tab-gallery" class="hidden max-w-md mx-auto space-y-4">
+            <div class="cyber-panel p-4 rounded-3xl space-y-4">
+                <div class="flex justify-between items-center px-1">
+                    <h2 class="text-lg font-bold text-slate-200">Arsip Foto</h2>
+                    <div class="flex gap-2">
+                        <input type="month" id="gallery-date-filter" class="p-2 text-xs bg-white/5 border cyber-border rounded-lg text-white focus:outline-none">
+                        <button onclick="fetchGalleryData()" class="p-2 text-xs bg-blue-600 rounded-lg font-bold">Refresh</button>
+                    </div>
+                </div>
+                <div id="gallery-grid" class="grid grid-cols-2 gap-3"></div>
+                <div id="gallery-loading" class="hidden text-center py-10 text-slate-500 text-sm">Mengambil data dari server Google Drive...</div>
+            </div>
+        </section>
+
+    </main>
+
+    <!-- Footer Action -->
+    <footer class="fixed bottom-0 left-0 right-0 p-4 z-40 bg-gradient-to-t from-[#0a0e17] via-[#0a0e17]/90 to-transparent">
+        <div id="footer-camera-action" class="max-w-md mx-auto">
+            <button onclick="processPhotoWorkflow()" class="w-full flex items-center justify-center gap-3 bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-blue-500 transition active:scale-95 text-lg">
+                <span class="text-xl">📸</span> AMBIL & PROSES DOKUMEN
+            </button>
+        </div>
+    </footer>
+
+    <!-- MODAL PROFIL -->
+    <div id="modal-profil" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden z-[100] flex items-center justify-center p-4">
+        <div class="cyber-panel p-6 rounded-3xl max-w-xs w-full cyber-border relative shadow-2xl">
+            <button onclick="toggleModal('profil')" class="absolute top-4 right-4 text-slate-500 hover:text-white">✕</button>
+            <h3 class="text-xl font-bold mb-5 text-blue-400 text-glow">Konfigurasi Pengambil Foto</h3>
+            <div class="space-y-4">
+                <div>
+                    <label class="text-xs text-slate-400">Nama Lengkap (Stempel Foto)</label>
+                    <input type="text" id="profil-nama" value="Heri Prasetyo" placeholder="Masukkan nama Anda" class="w-full mt-1 p-3 bg-white/5 border cyber-border rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500">
+                </div>
+                <button onclick="saveProfil()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-500 transition">SIMPAN PERUBAHAN</button>
+            </div>
+        </div>
     </div>
-  </header>
 
-  <!-- TAB 1: KAMERA DOKUMENTASI -->
-  <section id="tab-camera" class="max-w-md mx-auto p-4 flex flex-col gap-4">
-    <div class="bg-slate-900 rounded-2xl overflow-hidden relative shadow-xl">
-      <video id="webcam" autoplay playsinline class="w-full h-64 object-cover"></video>
-      <canvas id="canvas" class="hidden"></canvas>
-      
-      <div id="loading-overlay" class="absolute inset-0 bg-black/70 hidden flex-col items-center justify-center text-white p-4 text-center">
-        <div class="animate-spin rounded-full h-10 w-10 border-4 border-blue-500 border-t-transparent mb-3"></div>
-        <p id="loading-text" class="text-sm font-medium">Memproses foto & lokasi...</p>
-      </div>
+    <!-- MODAL VIEW DETAIL FOTO -->
+    <div id="modal-photo" class="fixed inset-0 bg-black/90 hidden z-[100] flex items-center justify-center p-4 overflow-y-auto">
+        <div class="max-w-xl w-full relative">
+            <button onclick="toggleModal('photo')" class="absolute top-2 right-2 bg-black/60 text-white rounded-full w-9 h-9 flex items-center justify-center font-bold z-10 hover:bg-red-500">✕</button>
+            <img id="modal-img" src="" class="w-full h-auto object-contain rounded-2xl shadow-xl">
+            <div class="mt-4 cyber-panel p-5 rounded-2xl text-xs space-y-2.5">
+                <p><strong><span class="text-slate-500">📅 Waktu:</span></strong> <span id="modal-date" class="text-slate-200"></span></p>
+                <p><strong><span class="text-slate-500">📍 Lokasi Alamat:</span></strong> <span id="modal-loc" class="text-slate-200"></span></p>
+                <p><strong><span class="text-slate-500">📝 Deskripsi:</span></strong> <span id="modal-desc" class="text-slate-200"></span></p>
+                <div class="flex gap-2 mt-4">
+                    <a id="modal-link" href="#" target="_blank" class="w-1/2 text-center bg-blue-600 text-white py-2.5 rounded-lg font-semibold text-xs transition">Buka di Drive</a>
+                    <button onclick="sharePhotoLink()" class="w-1/2 text-center bg-white/5 text-slate-300 py-2.5 rounded-lg font-semibold text-xs border cyber-border transition">Bagikan Link</button>
+                </div>
+            </div>
+        </div>
     </div>
 
-    <!-- Form Input Deskripsi -->
-    <div class="bg-white p-4 rounded-xl shadow-sm border border-slate-200">
-      <label class="block text-xs font-bold text-slate-500 uppercase mb-2">Deskripsi Pekerjaan</label>
-      <textarea id="input-desc" rows="2" placeholder="Tuliskan keterangan detail pekerjaan di sini..." class="w-full p-2 border border-slate-300 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"></textarea>
+    <!-- LOADING OVERLAY -->
+    <div id="loading-overlay" class="fixed inset-0 bg-black/90 hidden z-[200] flex-col items-center justify-center p-6 text-center backdrop-blur-sm">
+        <div class="w-24 h-24 border-8 border-blue-500 border-t-transparent rounded-full animate-spin bg-glow mb-8"></div>
+        <h2 class="text-3xl font-bold text-white mb-2 text-glow">MENYIMPAN DOKUMEN</h2>
+        <p id="loading-status" class="text-blue-300 max-w-xs">Menempel stempel solid putih dan mengirim ke Google Drive...</p>
     </div>
 
-    <!-- Informasi GPS -->
-    <div class="bg-blue-50 border border-blue-200 p-3 rounded-xl text-xs text-blue-800">
-      <strong>Status GPS:</strong> <span id="gps-status">Mencari lokasi...</span>
-    </div>
+    <script>
+        // TAUTAN GOOGLE APPS SCRIPT ANDA
+        const GAS_URL = "https://script.google.com/macros/s/AKfycbz0gBWEtCoZgA6FXrp82zkB24q77vUN1qDLjINEj8qi7Fsoj1yGK-ylTM4ch7380V8IPw/exec";
 
-    <button onclick="takeAndUploadPhoto()" class="bg-blue-600 text-white font-bold py-3 rounded-xl shadow-lg hover:bg-blue-700 transition active:scale-95 text-center">
-      📸 Ambil & Simpan Foto
-    </button>
-  </section>
+        let currentCoords = null;
+        let currentAddress = "Mencari nama jalan...";
+        let isGpsSuccess = false;
 
-  <!-- TAB 2: GALERI KALENDER (Sesuai Gambar 2) -->
-  <section id="tab-gallery" class="max-w-md mx-auto p-4 hidden">
-    <!-- Header Bulan -->
-    <div class="flex justify-between items-end mb-4">
-      <div>
-        <span id="gallery-month-num" class="text-5xl font-serif font-bold text-slate-800">04</span>
-        <span id="gallery-year" class="text-xs text-slate-400 block font-sans">2026</span>
-        <span id="gallery-month-name" class="text-2xl font-serif italic text-slate-600">April</span>
-      </div>
-      <div class="flex gap-1 text-slate-400">
-        <button onclick="changeMonth(-1)" class="p-2 hover:bg-slate-200 rounded-full">❮</button>
-        <button onclick="changeMonth(1)" class="p-2 hover:bg-slate-200 rounded-full">❯</button>
-      </div>
-    </div>
-
-    <!-- Mode Toggle (Compact / Full) -->
-    <div class="bg-slate-200 p-1 rounded-full flex text-center text-xs font-medium mb-4">
-      <button class="w-1/2 py-1.5 rounded-full text-slate-500">Compact</button>
-      <button class="w-1/2 py-1.5 rounded-full bg-white text-slate-800 shadow-sm font-bold">Full</button>
-    </div>
-
-    <!-- Grid Nama Hari -->
-    <div class="grid grid-cols-7 text-center text-xs font-semibold text-slate-400 mb-2">
-      <div>Sun</div><div>Mon</div><div>Tue</div><div>Wed</div><div>Thu</div><div>Fri</div><div>Sat</div>
-    </div>
-
-    <!-- Grid Kalender Foto -->
-    <div id="calendar-grid" class="grid grid-cols-7 gap-1.5">
-      <!-- Item kalender di-generate via JavaScript -->
-    </div>
-  </section>
-
-  <!-- Modal View Detail Foto -->
-  <div id="modal-photo" class="fixed inset-0 bg-black/80 hidden z-50 flex items-center justify-center p-4">
-    <div class="bg-white rounded-2xl max-w-sm w-full overflow-hidden shadow-2xl relative">
-      <button onclick="closeModal()" class="absolute top-2 right-2 bg-black/50 text-white rounded-full w-8 h-8 flex items-center justify-center font-bold">✕</button>
-      <img id="modal-img" src="" class="w-full h-auto object-cover">
-      <div class="p-4 text-xs text-slate-700 flex flex-col gap-1">
-        <p><strong>Tanggal:</strong> <span id="modal-date"></span></p>
-        <p><strong>Lokasi:</strong> <span id="modal-loc"></span></p>
-        <p><strong>Deskripsi:</strong> <span id="modal-desc"></span></p>
-        <a id="modal-link" href="#" target="_blank" class="mt-2 block text-center bg-blue-600 text-white py-2 rounded-lg font-semibold">Buka di Google Drive</a>
-      </div>
-    </div>
-  </div>
-
-  <script>
-    // URL Google Apps Script Anda
-    const GAS_URL = "https://script.google.com/macros/s/AKfycbz0gBWEtCoZgA6FXrp82zkB24q77vUN1qDLjINEj8qi7Fsoj1yGK-ylTM4ch7380V8IPw/exec";
-
-    let currentLocation = "Mencari koordinat...";
-    let photosData = {};
-    let currentDate = new Date();
-
-    // Inisialisasi Kamera & GPS
-    async function initCamera() {
-      try {
-        const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment" } });
-        document.getElementById('webcam').srcObject = stream;
-      } catch (err) {
-        alert("Gagal mengakses kamera: " + err.message);
-      }
-
-      if ("geolocation" in navigator) {
-        navigator.geolocation.getCurrentPosition(
-          (pos) => {
-            currentLocation = `Lat: ${pos.coords.latitude.toFixed(4)}, Lng: ${pos.coords.longitude.toFixed(4)}`;
-            document.getElementById('gps-status').innerText = currentLocation;
-          },
-          (err) => {
-            document.getElementById('gps-status').innerText = "GPS gagal dimuat";
-          }
-        );
-      }
-    }
-
-    // Switch Tab Navbar
-    function switchTab(tab) {
-      if(tab === 'camera') {
-        document.getElementById('tab-camera').classList.remove('hidden');
-        document.getElementById('tab-gallery').classList.add('hidden');
-        document.getElementById('btn-tab-camera').className = "px-3 py-1 text-sm bg-blue-600 rounded-lg font-semibold";
-        document.getElementById('btn-tab-gallery').className = "px-3 py-1 text-sm bg-slate-700 rounded-lg font-semibold";
-      } else {
-        document.getElementById('tab-camera').classList.add('hidden');
-        document.getElementById('tab-gallery').classList.remove('hidden');
-        document.getElementById('btn-tab-gallery').className = "px-3 py-1 text-sm bg-blue-600 rounded-lg font-semibold";
-        document.getElementById('btn-tab-camera').className = "px-3 py-1 text-sm bg-slate-700 rounded-lg font-semibold";
-        fetchGalleryData();
-      }
-    }
-
-    // Ambil & Stamping Foto (Watermark Overlay)
-    function takeAndUploadPhoto() {
-      const video = document.getElementById('webcam');
-      const canvas = document.getElementById('canvas');
-      const desc = document.getElementById('input-desc').value;
-      const loading = document.getElementById('loading-overlay');
-
-      if (!desc) {
-        alert("Silakan isi deskripsi pekerjaan terlebih dahulu.");
-        return;
-      }
-
-      loading.classList.remove('hidden');
-      loading.classList.add('flex');
-
-      canvas.width = video.videoWidth || 640;
-      canvas.height = video.videoHeight || 480;
-      const ctx = canvas.getContext('2d');
-
-      // Render Video Frame
-      ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
-
-      // Render Dark Watermark Overlay di Bagian Bawah
-      const overlayHeight = 110;
-      ctx.fillStyle = "rgba(0, 0, 0, 0.65)";
-      ctx.fillRect(0, canvas.height - overlayHeight, canvas.width, overlayHeight);
-
-      // Watermark Text (Style Foto 1)
-      const timestamp = new Date().toLocaleString('id-ID');
-      ctx.fillStyle = "#ffffff";
-      ctx.font = "bold 16px sans-serif";
-      ctx.fillText(`🕒 ${timestamp}`, 15, canvas.height - 75);
-      ctx.fillText(`📍 ${currentLocation}`, 15, canvas.height - 50);
-      ctx.fillText(`📝 ${desc}`, 15, canvas.height - 25);
-
-      const base64Image = canvas.toDataURL('image/jpeg');
-      const dateKey = new Date().toISOString().split('T')[0];
-
-      // Kirim data ke Google Apps Script (Menggunakan mode text/plain untuk menghindari issue CORS)
-fetch(GAS_URL, {
-  method: 'POST',
-  headers: {
-    'Content-Type': 'text/plain;charset=utf-8',
-  },
-  body: JSON.stringify({
-    image: base64Image,
-    date: dateKey,
-    location: currentLocation,
-    description: desc
-  })
-})
-.then(res => res.json())
-.then(data => {
-  loading.classList.add('hidden');
-  loading.classList.remove('flex');
-  alert("Foto berhasil disimpan ke Google Drive!");
-  document.getElementById('input-desc').value = "";
-})
-.catch(err => {
-  // Jika respons sukses disimpan tetapi browser memblokir JSON response
-  loading.classList.add('hidden');
-  loading.classList.remove('flex');
-  alert("Foto berhasil diproses! Silakan cek folder Google Drive & Galeri Anda.");
-  document.getElementById('input-desc').value = "";
-});
-    }
-
-    // Render Galeri Kalender (Foto 2 Style)
-    function fetchGalleryData() {
-      fetch(GAS_URL)
-        .then(res => res.json())
-        .then(data => {
-          photosData = {};
-          data.forEach(item => {
-            photosData[item.date] = item;
-          });
-          renderCalendar();
+        document.addEventListener('DOMContentLoaded', () => {
+            loadProfil();
+            initWebcamAndGps();
+            updateUiTimestamp();
+            const today = new Date();
+            document.getElementById('gallery-date-filter').value = today.toISOString().slice(0, 7);
         });
-    }
 
-    function renderCalendar() {
-      const grid = document.getElementById('calendar-grid');
-      grid.innerHTML = "";
-
-      const year = currentDate.getFullYear();
-      const month = currentDate.getMonth();
-
-      document.getElementById('gallery-month-num').innerText = String(month + 1).padStart(2, '0');
-      document.getElementById('gallery-year').innerText = year;
-      document.getElementById('gallery-month-name').innerText = new Date(year, month).toLocaleString('en', { month: 'long' });
-
-      const firstDay = new Date(year, month, 1).getDay();
-      const daysInMonth = new Date(year, month + 1, 0).getDate();
-
-      // Empty slots for previous month padding
-      for (let i = 0; i < firstDay; i++) {
-        grid.innerHTML += `<div class="aspect-square opacity-20 text-xs p-1">${new Date(year, month, -firstDay + i + 1).getDate()}</div>`;
-      }
-
-      // Current Month Days
-      for (let day = 1; day <= daysInMonth; day++) {
-        const dateStr = `${year}-${String(month + 1).padStart(2, '0')}-${String(day).padStart(2, '0')}`;
-        const photo = photosData[dateStr];
-
-        if (photo) {
-          grid.innerHTML += `
-            <div onclick="openModal('${photo.url}', '${photo.date}', '${photo.location}', '${photo.description}')" 
-                 class="aspect-square bg-white border border-slate-200 rounded-lg p-0.5 shadow-sm cursor-pointer hover:scale-105 transition relative overflow-hidden flex flex-col justify-between">
-              <span class="text-[10px] font-bold text-slate-700 px-1 z-10">${day}</span>
-              <img src="${photo.url}" class="w-full h-4/5 object-cover rounded-sm stamp-border" />
-            </div>`;
-        } else {
-          grid.innerHTML += `
-            <div class="aspect-square bg-white border border-slate-100 rounded-lg p-1 text-xs text-slate-400">
-              ${day}
-            </div>`;
+        function loadProfil() {
+            const savedNama = localStorage.getItem('workcam_nama');
+            if (savedNama) {
+                document.getElementById('profil-nama').value = savedNama;
+            }
         }
-      }
-    }
 
-    function changeMonth(offset) {
-      currentDate.setMonth(currentDate.getMonth() + offset);
-      renderCalendar();
-    }
+        function saveProfil() {
+            const nama = document.getElementById('profil-nama').value;
+            if (nama) {
+                localStorage.setItem('workcam_nama', nama);
+                toggleModal('profil');
+                alert("Profil berhasil disimpan!");
+            }
+        }
 
-    function openModal(url, date, loc, desc) {
-      document.getElementById('modal-img').src = url;
-      document.getElementById('modal-date').innerText = date;
-      document.getElementById('modal-loc').innerText = loc;
-      document.getElementById('modal-desc').innerText = desc;
-      document.getElementById('modal-link').href = url;
-      document.getElementById('modal-photo').classList.remove('hidden');
-    }
+        function updateUiTimestamp() {
+            const now = new Date();
+            document.getElementById('ui-timestamp').innerText = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' | ' + now.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
+            setTimeout(updateUiTimestamp, 60000);
+        }
 
-    function closeModal() {
-      document.getElementById('modal-photo').classList.add('hidden');
-    }
+        async function initWebcamAndGps() {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1080 }, height: { ideal: 1440 } } });
+                document.getElementById('webcam').srcObject = stream;
+            } catch (err) {
+                alert("Gagal mengakses kamera: " + err.message);
+            }
 
-    // Jalankan Kamera saat awal
-    initCamera();
-  </script>
+            if ("geolocation" in navigator) {
+                navigator.geolocation.getCurrentPosition(
+                    async (pos) => {
+                        currentCoords = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
+                        isGpsSuccess = true;
+                        document.getElementById('ui-location').innerText = "GPS Terkunci";
+                        fetchAddressFromCoords(pos.coords.latitude, pos.coords.longitude);
+                    },
+                    (err) => {
+                        document.getElementById('ui-location').innerText = "GPS Gagal";
+                    },
+                    { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+                );
+            }
+        }
+
+        async function fetchAddressFromCoords(lat, lng) {
+            try {
+                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=id`);
+                const data = await res.json();
+                if (data && data.display_name) {
+                    const a = data.address;
+                    currentAddress = (a.road || a.pedestrian || a.suburb || data.name || "Lokasi terdekat") + ", " + (a.village || a.city_district || a.city || "");
+                }
+            } catch (e) {
+                currentAddress = `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`;
+            }
+        }
+
+        function toggleModal(id) {
+            document.getElementById(`modal-${id}`).classList.toggle('hidden');
+        }
+
+        function switchTab(tab) {
+            const camSec = document.getElementById('tab-camera');
+            const galSec = document.getElementById('tab-gallery');
+            const navCam = document.getElementById('nav-camera');
+            const navGal = document.getElementById('nav-gallery');
+            const footerCam = document.getElementById('footer-camera-action');
+
+            if (tab === 'camera') {
+                camSec.classList.remove('hidden'); galSec.classList.add('hidden');
+                navCam.className = "w-1/2 text-center py-2 tab-active text-slate-300 font-medium";
+                navGal.className = "w-1/2 text-center py-2 text-slate-500 font-medium";
+                footerCam.classList.remove('hidden');
+            } else {
+                camSec.classList.add('hidden'); galSec.classList.remove('hidden');
+                navGal.className = "w-1/2 text-center py-2 tab-active text-slate-300 font-medium";
+                navCam.className = "w-1/2 text-center py-2 text-slate-500 font-medium";
+                footerCam.classList.add('hidden');
+                fetchGalleryData();
+            }
+        }
+
+        async function processPhotoWorkflow() {
+            const desc = document.getElementById('input-desc').value;
+            const namaField = localStorage.getItem('workcam_nama') || "Heri Prasetyo";
+
+            if (!desc) { alert("Harap masukkan keterangan pekerjaan."); return; }
+
+            document.getElementById('loading-overlay').classList.remove('hidden');
+
+            try {
+                const stampedImageBase64 = await createStampedImage(desc, namaField);
+                await uploadPhotoToGas(stampedImageBase64, desc);
+                document.getElementById('loading-overlay').classList.add('hidden');
+                document.getElementById('input-desc').value = "";
+                alert("Foto berhasil disimpan ke Google Drive dengan Watermark Solid Putih!");
+            } catch (err) {
+                document.getElementById('loading-overlay').classList.add('hidden');
+                alert("Gagal memproses foto: " + err);
+            }
+        }
+
+        // PEMBUATAN OVERLAY WATERMARK SOLID PUTIH
+        function createStampedImage(desc, nama) {
+            return new Promise((resolve) => {
+                const video = document.getElementById('webcam');
+                const canvas = document.getElementById('canvas');
+                const ctx = canvas.getContext('2d');
+
+                canvas.width = video.videoWidth || 1080;
+                canvas.height = video.videoHeight || 1440;
+
+                // 1. Render Foto Asli
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                // 2. Render Box Solid Putih di Bagian Bawah
+                const overlayHeight = Math.round(canvas.height * 0.16);
+                ctx.fillStyle = "#ffffff";
+                ctx.fillRect(0, canvas.height - overlayHeight, canvas.width, overlayHeight);
+
+                // 3. Render Teks
+                const fontSize = Math.round(canvas.width / 32);
+                ctx.fillStyle = "#1e293b"; // Warna font slate tua
+                ctx.font = `bold ${fontSize}px sans-serif`;
+                ctx.textBaseline = "top";
+
+                const paddingX = Math.round(canvas.width / 35);
+                const paddingY = canvas.height - overlayHeight + Math.round(overlayHeight / 6);
+                const lineSpacing = Math.round(fontSize * 1.4);
+
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                const dateStr = now.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+
+                // Baris 1: Nama Pengambil Foto
+                ctx.fillText(`👤 Nama: ${nama.toUpperCase()}`, paddingX, paddingY);
+                // Baris 2: Lokasi Jalan/Tempat
+                ctx.fillText(`📍 Lokasi: ${currentAddress}`, paddingX, paddingY + lineSpacing);
+                // Baris 3: Timestamp Jam & Tanggal
+                ctx.fillText(`⏰ Waktu: ${timeStr} | ${dateStr}`, paddingX, paddingY + (lineSpacing * 2));
+
+                resolve(canvas.toDataURL('image/jpeg', 0.9));
+            });
+        }
+
+        async function uploadPhotoToGas(base64Image, desc) {
+            const dateKey = new Date().toISOString().split('T')[0];
+            const timestampData = new Date().toLocaleString('id-ID');
+
+            await fetch(GAS_URL, {
+                method: 'POST',
+                mode: 'no-cors',
+                headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                body: JSON.stringify({
+                    image: base64Image,
+                    date: dateKey,
+                    fullTimestamp: timestampData,
+                    location: currentAddress,
+                    coords: currentCoords || "",
+                    description: desc
+                })
+            });
+        }
+
+        async function fetchGalleryData() {
+            const grid = document.getElementById('gallery-grid');
+            const loading = document.getElementById('gallery-loading');
+            const dateFilter = document.getElementById('gallery-date-filter').value;
+
+            grid.innerHTML = "";
+            loading.classList.remove('hidden');
+
+            try {
+                const response = await fetch(GAS_URL);
+                const data = await response.json();
+                loading.classList.add('hidden');
+
+                if (data && data.length > 0) {
+                    let filteredData = data;
+                    if (dateFilter) {
+                        filteredData = data.filter(item => item.date && item.date.startsWith(dateFilter));
+                    }
+
+                    if (filteredData.length === 0) {
+                        grid.innerHTML = `<div class="col-span-2 text-center py-10 text-slate-600 text-xs">Foto bulan ini belum ada.</div>`;
+                        return;
+                    }
+
+                    filteredData.forEach(item => {
+                        grid.innerHTML += `
+                            <div onclick="openPhotoModal('${item.url}', '${item.fullTimestamp}', '${item.location}', '${item.description}')" 
+                                 class="relative aspect-[3/4] bg-white/5 border cyber-border rounded-2xl overflow-hidden cursor-pointer hover:border-blue-400 group transition">
+                                <img src="${item.url}" class="w-full h-full object-cover">
+                                <div class="absolute inset-x-0 bottom-0 p-2.5 bg-gradient-to-t from-black via-black/70 to-transparent">
+                                    <p class="text-[9px] font-bold text-white">${item.date}</p>
+                                    <p class="text-[8px] text-slate-300 line-clamp-2">${item.description}</p>
+                                </div>
+                            </div>`;
+                    });
+                } else {
+                    grid.innerHTML = `<div class="col-span-2 text-center py-10 text-slate-600 text-xs">Arsip galeri kosong.</div>`;
+                }
+            } catch (err) {
+                loading.classList.add('hidden');
+                grid.innerHTML = `<div class="col-span-2 text-center py-10 text-red-500 text-xs">Gagal memuat galeri.</div>`;
+            }
+        }
+
+        function openPhotoModal(url, date, loc, desc) {
+            document.getElementById('modal-img').src = url;
+            document.getElementById('modal-date').innerText = date;
+            document.getElementById('modal-loc').innerText = loc;
+            document.getElementById('modal-desc').innerText = desc;
+            document.getElementById('modal-link').href = url;
+            toggleModal('photo');
+            window.currentSharedPhotoLink = url;
+        }
+
+        function sharePhotoLink() {
+            if (window.currentSharedPhotoLink) {
+                navigator.clipboard.writeText(window.currentSharedPhotoLink);
+                alert("Link foto disalin ke clipboard!");
+            }
+        }
+    </script>
 </body>
 </html>
