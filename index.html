@@ -246,46 +246,46 @@
             }
         }
 
-        // PEMBUATAN OVERLAY WATERMARK SOLID PUTIH
+        // PERBAIKAN: Fungsi createStampedImage agar tidak terpotong
         function createStampedImage(desc, nama) {
             return new Promise((resolve) => {
                 const video = document.getElementById('webcam');
                 const canvas = document.getElementById('canvas');
                 const ctx = canvas.getContext('2d');
 
-                canvas.width = video.videoWidth || 1080;
-                canvas.height = video.videoHeight || 1440;
+                // Gunakan dimensi visual video di layar, agar watermark proporsional dengan yang terlihat
+                canvas.width = video.videoWidth;
+                canvas.height = video.videoHeight;
 
-                // 1. Render Foto Asli
+                // 1. Gambar frame video asli
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-                // 2. Render Box Solid Putih di Bagian Bawah
-                const overlayHeight = Math.round(canvas.height * 0.16);
-                ctx.fillStyle = "#ffffff";
+                // 2. Buat Stempel Solid Putih di Bagian Bawah
+                // Kita gunakan persentase yang lebih aman agar tidak terlalu mepet
+                const overlayHeight = Math.round(canvas.height * 0.18); 
+                ctx.fillStyle = "#ffffff"; 
                 ctx.fillRect(0, canvas.height - overlayHeight, canvas.width, overlayHeight);
 
-                // 3. Render Teks
-                const fontSize = Math.round(canvas.width / 32);
-                ctx.fillStyle = "#1e293b"; // Warna font slate tua
+                // 3. Tambahkan Teks 
+                const fontSize = Math.round(canvas.height * 0.035); // Font disesuaikan dengan tinggi canvas
+                ctx.fillStyle = "#1e293b"; 
                 ctx.font = `bold ${fontSize}px sans-serif`;
                 ctx.textBaseline = "top";
 
-                const paddingX = Math.round(canvas.width / 35);
-                const paddingY = canvas.height - overlayHeight + Math.round(overlayHeight / 6);
-                const lineSpacing = Math.round(fontSize * 1.4);
+                const paddingX = Math.round(canvas.width * 0.05); // Padding 5% dari lebar
+                const startY = canvas.height - overlayHeight + (overlayHeight * 0.2); 
+                const lineSpacing = Math.round(fontSize * 1.5);
 
                 const now = new Date();
                 const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
                 const dateStr = now.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
 
-                // Baris 1: Nama Pengambil Foto
-                ctx.fillText(`👤 Nama: ${nama.toUpperCase()}`, paddingX, paddingY);
-                // Baris 2: Lokasi Jalan/Tempat
-                ctx.fillText(`📍 Lokasi: ${currentAddress}`, paddingX, paddingY + lineSpacing);
-                // Baris 3: Timestamp Jam & Tanggal
-                ctx.fillText(`⏰ Waktu: ${timeStr} | ${dateStr}`, paddingX, paddingY + (lineSpacing * 2));
+                // Render Teks
+                ctx.fillText(`👤 Nama: ${nama.toUpperCase()}`, paddingX, startY);
+                ctx.fillText(`📍 Lokasi: ${currentAddress.substring(0, 45)}...`, paddingX, startY + lineSpacing);
+                ctx.fillText(`⏰ Waktu: ${timeStr} | ${dateStr}`, paddingX, startY + (lineSpacing * 2));
 
-                resolve(canvas.toDataURL('image/jpeg', 0.9));
+                resolve(canvas.toDataURL('image/jpeg', 0.9)); 
             });
         }
 
