@@ -22,10 +22,9 @@
 </head>
 <body class="font-sans h-screen w-screen relative select-none">
 
-    <!-- CAMERA CONTAINER (Tampilan Apa Adanya & Tidak Cropped) -->
+    <!-- CAMERA CONTAINER -->
     <div class="relative w-full h-full bg-black overflow-hidden flex items-center justify-center">
         
-        <!-- object-contain membuat video tidak ter-crop / tidak ter-zoom paksa -->
         <video id="webcam" autoplay playsinline class="w-full h-full object-contain transition-transform duration-300"></video>
         <canvas id="canvas" class="hidden"></canvas>
 
@@ -111,7 +110,7 @@
                 <h2 class="text-2xl font-bold text-white tracking-tight">Gallery</h2>
                 <p id="gallery-sub-header" class="text-xs text-zinc-500 font-medium">Agustus 2026</p>
             </div>
-            <button onclick="toggleModal('gallery')" class="text-zinc-400 hover:text-white font-bold bg-zinc-900 p-2 rounded-full">✕</button>
+            <button onclick="closeGalleryTab()" class="text-zinc-400 hover:text-white font-bold bg-zinc-900 p-2 rounded-full w-10 h-10 flex items-center justify-center">✕</button>
         </div>
 
         <div id="view-feed" class="flex flex-col gap-6 mt-6"></div>
@@ -127,14 +126,23 @@
         </div>
     </div>
 
-    <!-- LIGHTBOX PREVIEW -->
-    <div id="modal-preview" class="fixed inset-0 bg-black/70 backdrop-blur-2xl hidden z-[200] flex flex-col items-center justify-between p-6">
-        <div class="w-full flex justify-end">
-            <button onclick="closePreview()" class="text-white bg-zinc-800/80 p-3 rounded-full text-sm">✕</button>
+    <!-- LIGHTBOX PREVIEW WITH SWIPE SUPPORT -->
+    <div id="modal-preview" class="fixed inset-0 bg-black/90 backdrop-blur-2xl hidden z-[200] flex flex-col justify-between p-6">
+        <div class="w-full flex justify-between items-center">
+            <span id="preview-index" class="text-xs text-zinc-400 font-mono">1 / 1</span>
+            <button onclick="closePreview()" class="text-white bg-zinc-800/80 w-10 h-10 rounded-full flex items-center justify-center text-sm">✕</button>
         </div>
-        <div class="relative w-full max-w-md my-auto flex justify-center">
-            <img id="preview-img" src="" class="max-h-[70vh] w-auto rounded-3xl object-contain shadow-2xl border border-white/10">
+
+        <div id="swipe-area" class="relative w-full max-w-md my-auto flex items-center justify-center touch-pan-y">
+            <!-- Navigasi Panah Kiri -->
+            <button onclick="prevPhoto()" class="absolute left-2 z-10 bg-black/40 text-white w-10 h-10 rounded-full flex items-center justify-center text-xl backdrop-blur-md border border-white/10 active:scale-90">‹</button>
+
+            <img id="preview-img" src="" class="max-h-[70vh] w-auto rounded-3xl object-contain shadow-2xl border border-white/10 transition-transform duration-200">
+
+            <!-- Navigasi Panah Kanan -->
+            <button onclick="nextPhoto()" class="absolute right-2 z-10 bg-black/40 text-white w-10 h-10 rounded-full flex items-center justify-center text-xl backdrop-blur-md border border-white/10 active:scale-90">›</button>
         </div>
+
         <div class="w-full text-center pb-6">
             <p id="preview-date" class="text-yellow-400 font-bold text-xs tracking-wider"></p>
             <p id="preview-desc" class="text-zinc-300 text-sm mt-1"></p>
@@ -146,40 +154,47 @@
 
         let currentFacingMode = "environment"; 
         let videoTrack = null;
+        let mediaStream = null;
         let currentCoords = null;
         let currentAddress = "Mencari lokasi...";
         let currentZoomLevel = 1.0;
         let galleryData = [];
+        let currentIndex = 0;
         let isProcessing = false;
+
+        // Variabel untuk Deteksi Gesture Swipe
+        let touchStartX = 0;
+        let touchEndX = 0;
 
         document.addEventListener('DOMContentLoaded', () => {
             loadProfil();
             initCameraAndGps();
+            setupSwipeListener();
         });
 
+        // 1. KAMERA ON & OFF AUTOMATION
         async function initCameraAndGps() {
             try {
-                if (videoTrack) { videoTrack.stop(); }
+                stopCamera(); // Pastikan mati sebelum dinyalakan ulang
 
-                // Minta video rasio 16:9 alami
-                const stream = await navigator.mediaDevices.getUserMedia({ 
+                mediaStream = await navigator.mediaDevices.getUserMedia({ 
                     video: { 
                         facingMode: currentFacingMode, 
                         width: { ideal: 1080 }, 
                         height: { ideal: 1920 },
-                        aspectRatio: { ideal: 0.5625 } // 9:16
+                        aspectRatio: { ideal: 0.5625 }
                     } 
                 });
 
                 const video = document.getElementById('webcam');
-                video.srcObject = stream;
-                videoTrack = stream.getVideoTracks()[0];
+                video.srcObject = mediaStream;
+                videoTrack = mediaStream.getVideoTracks()[0];
                 applyZoom(currentZoomLevel);
             } catch (err) {
-                alert("Gagal mengakses kamera: " + err.message);
+                console.warn("Gagal mengakses kamera:", err.message);
             }
 
-            if ("geolocation" in navigator) {
+            if ("geolocation" in navigator && !currentCoords) {
                 navigator.geolocation.getCurrentPosition(
                     async (pos) => {
                         currentCoords = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
@@ -188,6 +203,14 @@
                     (err) => { currentAddress = "GPS lokasi tidak didapatkan"; },
                     { enableHighAccuracy: true, timeout: 8000 }
                 );
+            }
+        }
+
+        function stopCamera() {
+            if (mediaStream) {
+                mediaStream.getTracks().forEach(track => track.stop());
+                mediaStream = null;
+                videoTrack = null;
             }
         }
 
@@ -217,7 +240,8 @@
         }
 
         function applyZoom(level) {
-            document.getElementById('webcam').style.transform = `scale(${level})`;
+            const video = document.getElementById('webcam');
+            if (video) video.style.transform = `scale(${level})`;
         }
 
         async function toggleFlash() {
@@ -246,7 +270,7 @@
             }
         }
 
-        // --- ALUR PROSES AMBIL FOTO ---
+        // 2. SHUTTER & PROCESS FOTO
         async function processPhotoWorkflow(e) {
             if (e) { e.preventDefault(); }
             if (isProcessing) return;
@@ -269,23 +293,20 @@
             }
         }
 
-        // --- RENDER GAMBAR RASIO 16:9 TANPA ROTASI PAKSA ---
         function createStampedImage(desc, nama) {
             return new Promise((resolve) => {
                 const video = document.getElementById('webcam');
                 const canvas = document.getElementById('canvas');
                 const ctx = canvas.getContext('2d');
 
-                // Kanvas ber-rasio 16:9 (1080 x 1920)
                 const targetW = 1080;
                 const targetH = 1920;
                 canvas.width = targetW;
                 canvas.height = targetH;
 
-                // Lukis langsung dari kamera tanpa diputar/di-rotasi (APA ADANYA)
                 ctx.drawImage(video, 0, 0, targetW, targetH);
 
-                // HOVER WATERMARK CARD (Sesuai Referensi Gambar)
+                // Watermark Card
                 const cardMargin = 40;
                 const cardW = targetW - (cardMargin * 2);
                 const cardH = 320;
@@ -307,7 +328,6 @@
                 }
                 ctx.restore();
 
-                // MAP MINI
                 const mapMargin = 25;
                 const mapSize = 130;
                 const mapX = cardX + mapMargin;
@@ -336,7 +356,6 @@
                 ctx.arc(mapX + 65, mapY + 50, 16, 0, Math.PI * 2);
                 ctx.fill();
 
-                // TEKS LOKASI
                 const textX = mapX + mapSize + 25;
                 let currentY = mapY + 20;
 
@@ -355,7 +374,6 @@
                 ctx.font = "22px sans-serif";
                 ctx.fillText(`Lat: ${safeCoords.split(',')[0]}, Long: ${safeCoords.split(',')[1] || ''}`, textX, currentY);
 
-                // GARIS SEPARATOR
                 const dividerY = mapY + mapSize + 20;
                 ctx.strokeStyle = "#f1f5f9";
                 ctx.lineWidth = 2;
@@ -364,7 +382,6 @@
                 ctx.lineTo(cardX + cardW - mapMargin, dividerY);
                 ctx.stroke();
 
-                // WAKTU & KOMPAS
                 const now = new Date();
                 const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
                 const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit', weekday: 'short' });
@@ -425,9 +442,16 @@
             }
         }
 
+        // 3. FITUR GALERI & MATIKAN/HIDUPKAN KAMERA AUTOMATIS
         function openGalleryTab() {
-            toggleModal('gallery');
+            stopCamera(); // <-- KAMERA MATI SAAT BUKA GALERI
+            document.getElementById('modal-gallery').classList.remove('hidden');
             fetchGalleryData();
+        }
+
+        function closeGalleryTab() {
+            document.getElementById('modal-gallery').classList.add('hidden');
+            initCameraAndGps(); // <-- KAMERA HIDUP KEMBALI SAAT GALERI DITUTUP
         }
 
         async function fetchGalleryData() {
@@ -460,7 +484,8 @@
             }
 
             const groups = {};
-            data.forEach(item => {
+            data.forEach((item, idx) => {
+                item.globalIndex = idx; // Simpan indeks global
                 const key = item.date || "Terbaru";
                 if (!groups[key]) groups[key] = [];
                 groups[key].push(item);
@@ -470,7 +495,7 @@
                 let html = `<div><h3 class="text-sm font-semibold text-zinc-400 mb-3">${dateGroup}</h3><div class="grid grid-cols-4 gap-2.5">`;
                 items.forEach((item) => {
                     html += `
-                        <div onclick="openPreview('${item.url}', '${item.date}', '${item.description}')" class="aspect-square bg-zinc-900 rounded-2xl overflow-hidden border border-white/5 active:scale-95 transition cursor-pointer relative">
+                        <div onclick="openPreviewByIndex(${item.globalIndex})" class="aspect-square bg-zinc-900 rounded-2xl overflow-hidden border border-white/5 active:scale-95 transition cursor-pointer relative">
                             <img src="${item.url}" class="w-full h-full object-cover">
                         </div>`;
                 });
@@ -484,9 +509,10 @@
             calendarGrid.innerHTML = "";
 
             const mapPhotoByDay = {};
-            data.forEach(item => {
+            data.forEach((item, idx) => {
                 if (item.date) {
                     const dayNum = parseInt(item.date.split('-')[2]);
+                    item.globalIndex = idx;
                     mapPhotoByDay[dayNum] = item;
                 }
             });
@@ -495,7 +521,7 @@
                 const photo = mapPhotoByDay[day];
                 if (photo) {
                     calendarGrid.innerHTML += `
-                        <div onclick="openPreview('${photo.url}', '${photo.date}', '${photo.description}')" class="aspect-square rounded-2xl overflow-hidden border border-yellow-500/50 relative cursor-pointer active:scale-95 transition">
+                        <div onclick="openPreviewByIndex(${photo.globalIndex})" class="aspect-square rounded-2xl overflow-hidden border border-yellow-500/50 relative cursor-pointer active:scale-95 transition">
                             <img src="${photo.url}" class="w-full h-full object-cover brightness-75">
                             <span class="absolute inset-0 flex items-center justify-center font-bold text-xs text-white drop-shadow-md">${day}</span>
                         </div>`;
@@ -527,15 +553,67 @@
             }
         }
 
-        function openPreview(url, date, desc) {
-            document.getElementById('preview-img').src = url;
-            document.getElementById('preview-date').innerText = date || "";
-            document.getElementById('preview-desc').innerText = desc || "";
+        // 4. PREVIEW FOTO DENGAN SWIPE & INDEKS
+        function openPreviewByIndex(index) {
+            if (!galleryData || galleryData.length === 0) return;
+            currentIndex = index;
+            updatePreviewContent();
             document.getElementById('modal-preview').classList.remove('hidden');
+        }
+
+        function updatePreviewContent() {
+            const item = galleryData[currentIndex];
+            if (!item) return;
+
+            document.getElementById('preview-img').src = item.url;
+            document.getElementById('preview-date').innerText = item.date || "";
+            document.getElementById('preview-desc').innerText = item.description || "";
+            document.getElementById('preview-index').innerText = `${currentIndex + 1} / ${galleryData.length}`;
+        }
+
+        function nextPhoto() {
+            if (currentIndex < galleryData.length - 1) {
+                currentIndex++;
+                updatePreviewContent();
+            }
+        }
+
+        function prevPhoto() {
+            if (currentIndex > 0) {
+                currentIndex--;
+                updatePreviewContent();
+            }
         }
 
         function closePreview() {
             document.getElementById('modal-preview').classList.add('hidden');
+        }
+
+        // SWIPE GESTURE DETECTOR
+        function setupSwipeListener() {
+            const area = document.getElementById('swipe-area');
+
+            area.addEventListener('touchstart', (e) => {
+                touchStartX = e.changedTouches[0].screenX;
+            }, { passive: true });
+
+            area.addEventListener('touchend', (e) => {
+                touchEndX = e.changedTouches[0].screenX;
+                handleSwipeGesture();
+            }, { passive: true });
+        }
+
+        function handleSwipeGesture() {
+            const swipeDistance = touchEndX - touchStartX;
+            const threshold = 50; // Jarak minimal geser (px)
+
+            if (swipeDistance < -threshold) {
+                // Swipe Kiri -> Foto Selanjutnya
+                nextPhoto();
+            } else if (swipeDistance > threshold) {
+                // Swipe Kanan -> Foto Sebelumnya
+                prevPhoto();
+            }
         }
     </script>
 </body>
