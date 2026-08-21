@@ -3,171 +3,161 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
-    <title>WorkCam Doc v2.0</title>
-    <!-- Tailwind CSS CDN -->
+    <title>WorkCam Native UI</title>
     <script src="https://cdn.tailwindcss.com"></script>
     <style>
-        body { background-color: #0a0e17; color: #e0e6ed; -webkit-font-smoothing: antialiased; }
-        .cyber-panel { background: rgba(20, 26, 38, 0.75); backdrop-filter: blur(10px); border: 1px solid rgba(56, 189, 248, 0.2); }
-        .cyber-border { border-color: rgba(56, 189, 248, 0.3); }
-        .text-glow { text-shadow: 0 0 8px rgba(56, 189, 248, 0.6); }
-        .bg-glow { box-shadow: 0 0 15px rgba(56, 189, 248, 0.2); }
-        .tab-active { color: #38bdf8; position: relative; }
-        .tab-active::after { content: ''; position: absolute; bottom: -1px; left: 0; width: 100%; height: 2px; background-color: #38bdf8; box-shadow: 0 0 8px #38bdf8; }
-        .animate-scan { position: absolute; top: 0; left: 0; width: 100%; height: 2px; background: linear-gradient(90deg, transparent, #38bdf8, transparent); animation: scan 2s linear infinite; }
-        @keyframes scan { 0% { top: 0; } 100% { top: 100%; } }
+        body { background-color: #000; color: #fff; overflow: hidden; -webkit-font-smoothing: antialiased; }
+        
+        /* Grid Overlay Kamera Native */
+        .grid-lines { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); pointer-events: none; }
+        .grid-lines div { border: 0.5px solid rgba(255, 255, 255, 0.25); }
+
+        /* Zoom Pill Indicator */
+        .zoom-pill { background: rgba(0, 0, 0, 0.5); backdrop-filter: blur(8px); border-radius: 9999px; }
+        .zoom-btn { width: 36px; height: 36px; display: flex; items-center: center; justify-content: center; border-radius: 50%; font-size: 12px; font-weight: bold; transition: all 0.2s; }
+        .zoom-active { background-color: rgba(255, 255, 255, 0.2); color: #facc15; border: 1px solid #facc15; }
+
+        /* Reset Element UI Browser */
         input, textarea, button { -webkit-appearance: none; border-radius: 0; }
-        ::-webkit-scrollbar { width: 5px; }
-        ::-webkit-scrollbar-thumb { background: #38bdf8; border-radius: 5px; }
+        ::-webkit-scrollbar { width: 4px; }
+        ::-webkit-scrollbar-thumb { background: #38bdf8; border-radius: 4px; }
     </style>
 </head>
-<body class="font-sans flex flex-col h-screen">
+<body class="font-sans h-screen w-screen relative select-none">
 
-    <!-- Header / Navbar -->
-    <header class="cyber-panel px-4 py-3 shadow-lg z-50 fixed top-0 left-0 right-0">
-        <div class="flex items-center justify-between">
-            <div class="flex items-center gap-2">
-                <div class="w-2 h-6 bg-blue-500 rounded bg-glow"></div>
-                <h1 class="font-bold text-xl tracking-tight text-glow">Work<span class="text-blue-400">Cam</span> Doc</h1>
+    <!-- CAMERA CONTAINER (Full Screen Responsive) -->
+    <div class="relative w-full h-full bg-black overflow-hidden flex items-center justify-center">
+        
+        <!-- Video Stream -->
+        <video id="webcam" autoplay playsinline class="w-full h-full object-cover transition-transform duration-300"></video>
+        <canvas id="canvas" class="hidden"></canvas>
+
+        <!-- Grid Lines 3x3 Overlay -->
+        <div class="absolute inset-0 grid-lines z-10">
+            <div></div><div></div><div></div>
+            <div></div><div></div><div></div>
+            <div></div><div></div><div></div>
+        </div>
+
+        <!-- TOP BAR UI (Flash, Resolution, Settings) -->
+        <div class="absolute top-0 left-0 right-0 z-20 p-5 pt-8 bg-gradient-to-b from-black/80 via-black/30 to-transparent flex justify-between items-center text-white">
+            <button id="btn-flash" onclick="toggleFlash()" class="p-2 rounded-full active:scale-95 text-lg">⚡</button>
+            <span class="text-xs font-semibold tracking-wider bg-black/40 px-2.5 py-1 rounded-full border border-white/20">12M</span>
+            <button onclick="toggleModal('profil')" class="p-2 text-sm bg-black/40 rounded-full border border-white/20 active:scale-95">👤 Profil</button>
+            <button onclick="toggleModal('desc')" class="p-2 text-sm bg-black/40 rounded-full border border-white/20 active:scale-95">📝 Catatan</button>
+        </div>
+
+        <!-- BOTTOM CONTROL PANEL UI -->
+        <div class="absolute bottom-0 left-0 right-0 z-20 pb-8 pt-12 bg-gradient-to-t from-black via-black/80 to-transparent flex flex-col items-center gap-5">
+            
+            <!-- Zoom Controller (.6x, 1x, 2x, 3x) -->
+            <div class="zoom-pill flex items-center p-1 gap-1 border border-white/10">
+                <button onclick="setZoom(0.6, this)" class="zoom-btn text-white/70">.6</button>
+                <button onclick="setZoom(1.0, this)" class="zoom-btn zoom-active">1x</button>
+                <button onclick="setZoom(2.0, this)" class="zoom-btn text-white/70">2</button>
+                <button onclick="setZoom(3.0, this)" class="zoom-btn text-white/70">3</button>
             </div>
-            <div class="flex gap-1">
-                <button onclick="toggleModal('profil')" class="p-2 rounded-lg hover:bg-white/5 border cyber-border text-slate-400">👤</button>
+
+            <!-- Shutter Controls Bar -->
+            <div class="w-full px-8 flex items-center justify-between">
+                <!-- Gallery Preview Thumbnail -->
+                <button onclick="openGalleryTab()" class="w-12 h-12 rounded-full border-2 border-white/50 overflow-hidden bg-zinc-800 flex items-center justify-center active:scale-95 transition">
+                    <span id="gallery-icon" class="text-xs text-white/50">🖼️</span>
+                </button>
+
+                <!-- Native White Shutter Button -->
+                <button onclick="processPhotoWorkflow()" class="w-20 h-20 bg-white rounded-full border-4 border-zinc-400 active:scale-90 transition shadow-2xl flex items-center justify-center">
+                    <div class="w-16 h-16 rounded-full border-2 border-black/10"></div>
+                </button>
+
+                <!-- Camera Flip Button -->
+                <button onclick="flipCamera()" class="w-12 h-12 rounded-full bg-zinc-800/80 border border-white/20 flex items-center justify-center text-xl active:rotate-180 transition-transform duration-300">
+                    🔄
+                </button>
+            </div>
+
+            <!-- Mode Selector Slider -->
+            <div class="flex justify-center gap-6 text-xs font-bold tracking-widest text-white/60 pt-2">
+                <span class="hover:text-white cursor-pointer">PORTRAIT</span>
+                <span class="text-yellow-400 border-b-2 border-yellow-400 pb-0.5">PHOTO</span>
+                <span class="hover:text-white cursor-pointer">VIDEO</span>
+                <span class="hover:text-white cursor-pointer">MORE</span>
             </div>
         </div>
-        <div class="flex border-b cyber-border mt-3 text-sm">
-            <button id="nav-camera" onclick="switchTab('camera')" class="w-1/2 text-center py-2 tab-active text-slate-300 font-medium">KAMERA</button>
-            <button id="nav-gallery" onclick="switchTab('gallery')" class="w-1/2 text-center py-2 text-slate-500 font-medium">GALERI</button>
-        </div>
-    </header>
+    </div>
 
-    <!-- Main Content -->
-    <main class="flex-grow pt-[110px] pb-[80px] px-4 overflow-y-auto">
-
-        <!-- TAB KAMERA -->
-        <section id="tab-camera" class="max-w-md mx-auto space-y-4">
-            <div class="relative bg-black rounded-3xl overflow-hidden shadow-2xl bg-glow aspect-[3/4] cyber-border">
-                <video id="webcam" autoplay playsinline class="w-full h-full object-cover"></video>
-                <canvas id="canvas" class="hidden"></canvas>
-                <div class="animate-scan"></div>
-                <div class="absolute bottom-4 left-4 right-4 flex items-center justify-between px-3 py-2 cyber-panel rounded-full text-xs text-blue-300">
-                    <span id="ui-timestamp">...</span>
-                    <span id="ui-location">Mencari GPS...</span>
-                </div>
-            </div>
-
-            <div class="cyber-panel p-5 rounded-3xl space-y-3">
-                <label class="text-[11px] font-bold text-blue-400 uppercase tracking-widest text-glow">Keterangan Pekerjaan</label>
-                <textarea id="input-desc" rows="3" placeholder="Masukkan detail pekerjaan yang akan distempel ke foto..." class="w-full p-4 bg-white/5 border cyber-border rounded-xl text-sm focus:outline-none focus:ring-1 focus:ring-blue-500 placeholder:text-slate-600 text-white"></textarea>
-            </div>
-        </section>
-
-        <!-- TAB GALERI -->
-        <section id="tab-gallery" class="hidden max-w-md mx-auto space-y-4">
-            <div class="cyber-panel p-4 rounded-3xl space-y-4">
-                <div class="flex justify-between items-center px-1">
-                    <h2 class="text-lg font-bold text-slate-200">Arsip Foto</h2>
-                    <div class="flex gap-2">
-                        <input type="month" id="gallery-date-filter" class="p-2 text-xs bg-white/5 border cyber-border rounded-lg text-white focus:outline-none">
-                        <button onclick="fetchGalleryData()" class="p-2 text-xs bg-blue-600 rounded-lg font-bold">Refresh</button>
-                    </div>
-                </div>
-                <div id="gallery-grid" class="grid grid-cols-2 gap-3"></div>
-                <div id="gallery-loading" class="hidden text-center py-10 text-slate-500 text-sm">Mengambil data dari server Google Drive...</div>
-            </div>
-        </section>
-
-    </main>
-
-    <!-- Footer Action -->
-    <footer class="fixed bottom-0 left-0 right-0 p-4 z-40 bg-gradient-to-t from-[#0a0e17] via-[#0a0e17]/90 to-transparent">
-        <div id="footer-camera-action" class="max-w-md mx-auto">
-            <button onclick="processPhotoWorkflow()" class="w-full flex items-center justify-center gap-3 bg-blue-600 text-white font-bold py-4 rounded-2xl shadow-lg hover:bg-blue-500 transition active:scale-95 text-lg">
-                <span class="text-xl">📸</span> AMBIL & PROSES DOKUMEN
-            </button>
-        </div>
-    </footer>
-
-    <!-- MODAL PROFIL -->
-    <div id="modal-profil" class="fixed inset-0 bg-black/80 backdrop-blur-sm hidden z-[100] flex items-center justify-center p-4">
-        <div class="cyber-panel p-6 rounded-3xl max-w-xs w-full cyber-border relative shadow-2xl">
-            <button onclick="toggleModal('profil')" class="absolute top-4 right-4 text-slate-500 hover:text-white">✕</button>
-            <h3 class="text-xl font-bold mb-5 text-blue-400 text-glow">Konfigurasi Pengambil Foto</h3>
+    <!-- MODAL POPUP: PROFIL USER -->
+    <div id="modal-profil" class="fixed inset-0 bg-black/80 backdrop-blur-md hidden z-[100] flex items-center justify-center p-4">
+        <div class="bg-zinc-900 border border-zinc-700 p-6 rounded-3xl max-w-xs w-full relative shadow-2xl">
+            <button onclick="toggleModal('profil')" class="absolute top-4 right-4 text-zinc-400 hover:text-white">✕</button>
+            <h3 class="text-lg font-bold mb-4 text-yellow-400">Identitas Pengambil Foto</h3>
             <div class="space-y-4">
                 <div>
-                    <label class="text-xs text-slate-400">Nama Lengkap (Stempel Foto)</label>
-                    <input type="text" id="profil-nama" value="Heri Prasetyo" placeholder="Masukkan nama Anda" class="w-full mt-1 p-3 bg-white/5 border cyber-border rounded-lg text-sm text-white focus:outline-none focus:ring-1 focus:ring-blue-500">
+                    <label class="text-xs text-zinc-400">Nama Lengkap (Akan Dicetak ke Watermark)</label>
+                    <input type="text" id="profil-nama" value="Heri Prasetyo" class="w-full mt-1 p-3 bg-zinc-800 border border-zinc-700 rounded-xl text-sm text-white focus:outline-none focus:border-yellow-400">
                 </div>
-                <button onclick="saveProfil()" class="w-full bg-blue-600 text-white font-bold py-3 rounded-lg hover:bg-blue-500 transition">SIMPAN PERUBAHAN</button>
+                <button onclick="saveProfil()" class="w-full bg-yellow-400 text-black font-bold py-3 rounded-xl hover:bg-yellow-300 transition">SIMPAN</button>
             </div>
         </div>
     </div>
 
-    <!-- MODAL VIEW DETAIL FOTO -->
-    <div id="modal-photo" class="fixed inset-0 bg-black/90 hidden z-[100] flex items-center justify-center p-4 overflow-y-auto">
-        <div class="max-w-xl w-full relative">
-            <button onclick="toggleModal('photo')" class="absolute top-2 right-2 bg-black/60 text-white rounded-full w-9 h-9 flex items-center justify-center font-bold z-10 hover:bg-red-500">✕</button>
-            <img id="modal-img" src="" class="w-full h-auto object-contain rounded-2xl shadow-xl">
-            <div class="mt-4 cyber-panel p-5 rounded-2xl text-xs space-y-2.5">
-                <p><strong><span class="text-slate-500">📅 Waktu:</span></strong> <span id="modal-date" class="text-slate-200"></span></p>
-                <p><strong><span class="text-slate-500">📍 Lokasi Alamat:</span></strong> <span id="modal-loc" class="text-slate-200"></span></p>
-                <p><strong><span class="text-slate-500">📝 Deskripsi:</span></strong> <span id="modal-desc" class="text-slate-200"></span></p>
-                <div class="flex gap-2 mt-4">
-                    <a id="modal-link" href="#" target="_blank" class="w-1/2 text-center bg-blue-600 text-white py-2.5 rounded-lg font-semibold text-xs transition">Buka di Drive</a>
-                    <button onclick="sharePhotoLink()" class="w-1/2 text-center bg-white/5 text-slate-300 py-2.5 rounded-lg font-semibold text-xs border cyber-border transition">Bagikan Link</button>
-                </div>
+    <!-- MODAL POPUP: KETERANGAN FOTO -->
+    <div id="modal-desc" class="fixed inset-0 bg-black/80 backdrop-blur-md hidden z-[100] flex items-center justify-center p-4">
+        <div class="bg-zinc-900 border border-zinc-700 p-6 rounded-3xl max-w-xs w-full relative shadow-2xl">
+            <button onclick="toggleModal('desc')" class="absolute top-4 right-4 text-zinc-400 hover:text-white">✕</button>
+            <h3 class="text-lg font-bold mb-4 text-yellow-400">Keterangan Pekerjaan</h3>
+            <div class="space-y-4">
+                <textarea id="input-desc" rows="4" placeholder="Masukkan rincian pekerjaan di sini..." class="w-full p-3 bg-zinc-800 border border-zinc-700 rounded-xl text-sm text-white focus:outline-none focus:border-yellow-400"></textarea>
+                <button onclick="toggleModal('desc')" class="w-full bg-yellow-400 text-black font-bold py-3 rounded-xl hover:bg-yellow-300 transition">GUNAKAN TEKS INI</button>
             </div>
         </div>
     </div>
 
-    <!-- LOADING OVERLAY -->
-    <div id="loading-overlay" class="fixed inset-0 bg-black/90 hidden z-[200] flex-col items-center justify-center p-6 text-center backdrop-blur-sm">
-        <div class="w-24 h-24 border-8 border-blue-500 border-t-transparent rounded-full animate-spin bg-glow mb-8"></div>
-        <h2 class="text-3xl font-bold text-white mb-2 text-glow">MENYIMPAN DOKUMEN</h2>
-        <p id="loading-status" class="text-blue-300 max-w-xs">Menempel stempel solid putih dan mengirim ke Google Drive...</p>
+    <!-- MODAL GALERI FOTO -->
+    <div id="modal-gallery" class="fixed inset-0 bg-black hidden z-[100] flex flex-col p-4 overflow-y-auto">
+        <div class="flex justify-between items-center py-4 border-b border-zinc-800">
+            <h2 class="text-lg font-bold text-white">Arsip Galeri Drive</h2>
+            <button onclick="toggleModal('gallery')" class="text-white font-bold text-lg bg-zinc-800 px-3 py-1 rounded-full">✕ Tutup</button>
+        </div>
+        <div id="gallery-grid" class="grid grid-cols-2 gap-3 mt-4">
+            <!-- Items galeri di-load via JavaScript -->
+        </div>
+        <div id="gallery-loading" class="hidden text-center py-12 text-zinc-500 text-sm">Mengambil data dari Google Drive...</div>
+    </div>
+
+    <!-- LOADING OVERLAY PROSES SIMPAN -->
+    <div id="loading-overlay" class="fixed inset-0 bg-black/90 hidden z-[200] flex flex-col items-center justify-center p-6 text-center backdrop-blur-md">
+        <div class="w-16 h-16 border-4 border-yellow-400 border-t-transparent rounded-full animate-spin mb-6"></div>
+        <h2 class="text-xl font-bold text-white mb-1">MEMPROSES FOTO</h2>
+        <p class="text-xs text-zinc-400">Menempel stempel solid putih & mengirim ke Google Drive...</p>
     </div>
 
     <script>
-        // TAUTAN GOOGLE APPS SCRIPT ANDA
+        // GOOGLE APPS SCRIPT URL ANDA
         const GAS_URL = "https://script.google.com/macros/s/AKfycbz0gBWEtCoZgA6FXrp82zkB24q77vUN1qDLjINEj8qi7Fsoj1yGK-ylTM4ch7380V8IPw/exec";
 
+        let currentFacingMode = "environment"; 
+        let videoTrack = null;
         let currentCoords = null;
-        let currentAddress = "Mencari nama jalan...";
-        let isGpsSuccess = false;
+        let currentAddress = "Mencari alamat lokasi...";
+        let currentZoomLevel = 1.0;
 
         document.addEventListener('DOMContentLoaded', () => {
             loadProfil();
-            initWebcamAndGps();
-            updateUiTimestamp();
-            const today = new Date();
-            document.getElementById('gallery-date-filter').value = today.toISOString().slice(0, 7);
+            initCameraAndGps();
         });
 
-        function loadProfil() {
-            const savedNama = localStorage.getItem('workcam_nama');
-            if (savedNama) {
-                document.getElementById('profil-nama').value = savedNama;
-            }
-        }
-
-        function saveProfil() {
-            const nama = document.getElementById('profil-nama').value;
-            if (nama) {
-                localStorage.setItem('workcam_nama', nama);
-                toggleModal('profil');
-                alert("Profil berhasil disimpan!");
-            }
-        }
-
-        function updateUiTimestamp() {
-            const now = new Date();
-            document.getElementById('ui-timestamp').innerText = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' }) + ' | ' + now.toLocaleDateString('id-ID', { day: '2-digit', month: 'short' });
-            setTimeout(updateUiTimestamp, 60000);
-        }
-
-        async function initWebcamAndGps() {
+        // --- INISIALISASI KAMERA & GPS ---
+        async function initCameraAndGps() {
             try {
-                const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "environment", width: { ideal: 1080 }, height: { ideal: 1440 } } });
-                document.getElementById('webcam').srcObject = stream;
+                if (videoTrack) { videoTrack.stop(); }
+                const stream = await navigator.mediaDevices.getUserMedia({ 
+                    video: { facingMode: currentFacingMode, width: { ideal: 1080 }, height: { ideal: 1440 } } 
+                });
+                const video = document.getElementById('webcam');
+                video.srcObject = stream;
+                videoTrack = stream.getVideoTracks()[0];
+                applyZoom(currentZoomLevel);
             } catch (err) {
                 alert("Gagal mengakses kamera: " + err.message);
             }
@@ -176,14 +166,10 @@
                 navigator.geolocation.getCurrentPosition(
                     async (pos) => {
                         currentCoords = `${pos.coords.latitude.toFixed(6)}, ${pos.coords.longitude.toFixed(6)}`;
-                        isGpsSuccess = true;
-                        document.getElementById('ui-location').innerText = "GPS Terkunci";
                         fetchAddressFromCoords(pos.coords.latitude, pos.coords.longitude);
                     },
-                    (err) => {
-                        document.getElementById('ui-location').innerText = "GPS Gagal";
-                    },
-                    { enableHighAccuracy: true, timeout: 5000, maximumAge: 0 }
+                    (err) => { currentAddress = "GPS lokasi tidak didapatkan"; },
+                    { enableHighAccuracy: true, timeout: 8000 }
                 );
             }
         }
@@ -194,98 +180,115 @@
                 const data = await res.json();
                 if (data && data.display_name) {
                     const a = data.address;
-                    currentAddress = (a.road || a.pedestrian || a.suburb || data.name || "Lokasi terdekat") + ", " + (a.village || a.city_district || a.city || "");
+                    currentAddress = (a.road || a.pedestrian || a.suburb || data.name || "Lokasi") + ", " + (a.village || a.city_district || a.city || "");
                 }
             } catch (e) {
                 currentAddress = `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`;
             }
         }
 
+        // --- KONTROL KAMERA (ZOOM, FLIP, FLASH) ---
+        function flipCamera() {
+            currentFacingMode = (currentFacingMode === "environment") ? "user" : "environment";
+            initCameraAndGps();
+        }
+
+        function setZoom(level, btnElem) {
+            currentZoomLevel = level;
+            document.querySelectorAll('.zoom-btn').forEach(btn => btn.classList.remove('zoom-active'));
+            btnElem.classList.add('zoom-active');
+            applyZoom(level);
+        }
+
+        function applyZoom(level) {
+            const video = document.getElementById('webcam');
+            video.style.transform = `scale(${level})`;
+        }
+
+        async function toggleFlash() {
+            if (videoTrack && videoTrack.getCapabilities().torch) {
+                try {
+                    const settings = videoTrack.getSettings();
+                    await videoTrack.applyConstraints({ advanced: [{ torch: !settings.torch }] });
+                } catch (e) { alert("Senter tidak dapat diaktifkan"); }
+            } else {
+                alert("Fitur Flash/Torch tidak didukung di perangkat ini");
+            }
+        }
+
+        // --- UTILITY MODAL & PROFIL ---
         function toggleModal(id) {
             document.getElementById(`modal-${id}`).classList.toggle('hidden');
         }
 
-        function switchTab(tab) {
-            const camSec = document.getElementById('tab-camera');
-            const galSec = document.getElementById('tab-gallery');
-            const navCam = document.getElementById('nav-camera');
-            const navGal = document.getElementById('nav-gallery');
-            const footerCam = document.getElementById('footer-camera-action');
+        function loadProfil() {
+            const savedNama = localStorage.getItem('workcam_nama');
+            if (savedNama) { document.getElementById('profil-nama').value = savedNama; }
+        }
 
-            if (tab === 'camera') {
-                camSec.classList.remove('hidden'); galSec.classList.add('hidden');
-                navCam.className = "w-1/2 text-center py-2 tab-active text-slate-300 font-medium";
-                navGal.className = "w-1/2 text-center py-2 text-slate-500 font-medium";
-                footerCam.classList.remove('hidden');
-            } else {
-                camSec.classList.add('hidden'); galSec.classList.remove('hidden');
-                navGal.className = "w-1/2 text-center py-2 tab-active text-slate-300 font-medium";
-                navCam.className = "w-1/2 text-center py-2 text-slate-500 font-medium";
-                footerCam.classList.add('hidden');
-                fetchGalleryData();
+        function saveProfil() {
+            const nama = document.getElementById('profil-nama').value;
+            if (nama) {
+                localStorage.setItem('workcam_nama', nama);
+                toggleModal('profil');
+                alert("Nama tersimpan!");
             }
         }
 
+        // --- PROSES PENGAMBILAN & STAMPING FOTO ---
         async function processPhotoWorkflow() {
-            const desc = document.getElementById('input-desc').value;
+            const desc = document.getElementById('input-desc').value || "Dokumentasi Pekerjaan";
             const namaField = localStorage.getItem('workcam_nama') || "Heri Prasetyo";
-
-            if (!desc) { alert("Harap masukkan keterangan pekerjaan."); return; }
 
             document.getElementById('loading-overlay').classList.remove('hidden');
 
             try {
-                const stampedImageBase64 = await createStampedImage(desc, namaField);
-                await uploadPhotoToGas(stampedImageBase64, desc);
+                const stampedBase64 = await createStampedImage(desc, namaField);
+                await uploadPhotoToGas(stampedBase64, desc);
                 document.getElementById('loading-overlay').classList.add('hidden');
-                document.getElementById('input-desc').value = "";
-                alert("Foto berhasil disimpan ke Google Drive dengan Watermark Solid Putih!");
+                alert("Foto berhasil diproses & disimpan!");
             } catch (err) {
                 document.getElementById('loading-overlay').classList.add('hidden');
                 alert("Gagal memproses foto: " + err);
             }
         }
 
-        // PERBAIKAN: Fungsi createStampedImage agar tidak terpotong
         function createStampedImage(desc, nama) {
             return new Promise((resolve) => {
                 const video = document.getElementById('webcam');
                 const canvas = document.getElementById('canvas');
                 const ctx = canvas.getContext('2d');
 
-                // Gunakan dimensi visual video di layar, agar watermark proporsional dengan yang terlihat
-                canvas.width = video.videoWidth;
-                canvas.height = video.videoHeight;
+                canvas.width = video.videoWidth || 1080;
+                canvas.height = video.videoHeight || 1440;
 
-                // 1. Gambar frame video asli
+                // 1. Render Frame Video
                 ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
 
-                // 2. Buat Stempel Solid Putih di Bagian Bawah
-                // Kita gunakan persentase yang lebih aman agar tidak terlalu mepet
-                const overlayHeight = Math.round(canvas.height * 0.18); 
-                ctx.fillStyle = "#ffffff"; 
+                // 2. Render Box Solid Putih di Bagian Bawah Foto (Tinggi 18%)
+                const overlayHeight = Math.round(canvas.height * 0.18);
+                ctx.fillStyle = "#ffffff";
                 ctx.fillRect(0, canvas.height - overlayHeight, canvas.width, overlayHeight);
 
-                // 3. Tambahkan Teks 
-                const fontSize = Math.round(canvas.height * 0.035); // Font disesuaikan dengan tinggi canvas
+                // 3. Render Teks Stempel
+                const fontSize = Math.round(canvas.height * 0.032);
                 ctx.fillStyle = "#1e293b"; 
                 ctx.font = `bold ${fontSize}px sans-serif`;
                 ctx.textBaseline = "top";
 
-                const paddingX = Math.round(canvas.width * 0.05); // Padding 5% dari lebar
-                const startY = canvas.height - overlayHeight + (overlayHeight * 0.2); 
-                const lineSpacing = Math.round(fontSize * 1.5);
+                const paddingX = Math.round(canvas.width * 0.05);
+                const startY = canvas.height - overlayHeight + (overlayHeight * 0.15);
+                const lineSpacing = Math.round(fontSize * 1.4);
 
                 const now = new Date();
                 const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
                 const dateStr = now.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
 
-                // Render Teks
                 ctx.fillText(`👤 Nama: ${nama.toUpperCase()}`, paddingX, startY);
-                ctx.fillText(`📍 Lokasi: ${currentAddress.substring(0, 45)}...`, paddingX, startY + lineSpacing);
+                ctx.fillText(`📍 Lokasi: ${currentAddress.substring(0, 48)}`, paddingX, startY + lineSpacing);
                 ctx.fillText(`⏰ Waktu: ${timeStr} | ${dateStr}`, paddingX, startY + (lineSpacing * 2));
 
-                resolve(canvas.toDataURL('image/jpeg', 0.9)); 
+                resolve(canvas.toDataURL('image/jpeg', 0.9));
             });
         }
 
@@ -308,10 +311,15 @@
             });
         }
 
+        // --- GALERI SYSTEM ---
+        function openGalleryTab() {
+            toggleModal('gallery');
+            fetchGalleryData();
+        }
+
         async function fetchGalleryData() {
             const grid = document.getElementById('gallery-grid');
             const loading = document.getElementById('gallery-loading');
-            const dateFilter = document.getElementById('gallery-date-filter').value;
 
             grid.innerHTML = "";
             loading.classList.remove('hidden');
@@ -322,50 +330,22 @@
                 loading.classList.add('hidden');
 
                 if (data && data.length > 0) {
-                    let filteredData = data;
-                    if (dateFilter) {
-                        filteredData = data.filter(item => item.date && item.date.startsWith(dateFilter));
-                    }
-
-                    if (filteredData.length === 0) {
-                        grid.innerHTML = `<div class="col-span-2 text-center py-10 text-slate-600 text-xs">Foto bulan ini belum ada.</div>`;
-                        return;
-                    }
-
-                    filteredData.forEach(item => {
+                    data.forEach(item => {
                         grid.innerHTML += `
-                            <div onclick="openPhotoModal('${item.url}', '${item.fullTimestamp}', '${item.location}', '${item.description}')" 
-                                 class="relative aspect-[3/4] bg-white/5 border cyber-border rounded-2xl overflow-hidden cursor-pointer hover:border-blue-400 group transition">
+                            <div class="relative aspect-[3/4] bg-zinc-900 rounded-xl overflow-hidden border border-zinc-800">
                                 <img src="${item.url}" class="w-full h-full object-cover">
-                                <div class="absolute inset-x-0 bottom-0 p-2.5 bg-gradient-to-t from-black via-black/70 to-transparent">
-                                    <p class="text-[9px] font-bold text-white">${item.date}</p>
-                                    <p class="text-[8px] text-slate-300 line-clamp-2">${item.description}</p>
+                                <div class="absolute inset-x-0 bottom-0 p-2 bg-black/80">
+                                    <p class="text-[9px] font-bold text-yellow-400">${item.date}</p>
+                                    <p class="text-[8px] text-zinc-300 truncate">${item.description}</p>
                                 </div>
                             </div>`;
                     });
                 } else {
-                    grid.innerHTML = `<div class="col-span-2 text-center py-10 text-slate-600 text-xs">Arsip galeri kosong.</div>`;
+                    grid.innerHTML = `<div class="col-span-2 text-center py-10 text-zinc-600 text-xs">Arsip galeri kosong.</div>`;
                 }
             } catch (err) {
                 loading.classList.add('hidden');
                 grid.innerHTML = `<div class="col-span-2 text-center py-10 text-red-500 text-xs">Gagal memuat galeri.</div>`;
-            }
-        }
-
-        function openPhotoModal(url, date, loc, desc) {
-            document.getElementById('modal-img').src = url;
-            document.getElementById('modal-date').innerText = date;
-            document.getElementById('modal-loc').innerText = loc;
-            document.getElementById('modal-desc').innerText = desc;
-            document.getElementById('modal-link').href = url;
-            toggleModal('photo');
-            window.currentSharedPhotoLink = url;
-        }
-
-        function sharePhotoLink() {
-            if (window.currentSharedPhotoLink) {
-                navigator.clipboard.writeText(window.currentSharedPhotoLink);
-                alert("Link foto disalin ke clipboard!");
             }
         }
     </script>
