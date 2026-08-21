@@ -147,12 +147,17 @@
             initCameraAndGps();
         });
 
-        // --- INISIALISASI KAMERA & GPS ---
+        // PERBAIKAN 1: Paksa kamera meminta resolusi Portrait (Tinggi > Lebar)
         async function initCameraAndGps() {
             try {
                 if (videoTrack) { videoTrack.stop(); }
                 const stream = await navigator.mediaDevices.getUserMedia({ 
-                    video: { facingMode: currentFacingMode, width: { ideal: 1080 }, height: { ideal: 1440 } } 
+                    video: { 
+                        facingMode: currentFacingMode, 
+                        width: { ideal: 1080, max: 1080 }, 
+                        height: { ideal: 1920, max: 1920 },
+                        aspectRatio: { ideal: 0.5625 } // Rasio 9:16 (Portrait Tegak)
+                    } 
                 });
                 const video = document.getElementById('webcam');
                 video.srcObject = stream;
@@ -174,17 +179,54 @@
             }
         }
 
-        async function fetchAddressFromCoords(lat, lng) {
-            try {
-                const res = await fetch(`https://nominatim.openstreetmap.org/reverse?lat=${lat}&lon=${lng}&format=json&accept-language=id`);
-                const data = await res.json();
-                if (data && data.display_name) {
-                    const a = data.address;
-                    currentAddress = (a.road || a.pedestrian || a.suburb || data.name || "Lokasi") + ", " + (a.village || a.city_district || a.city || "");
+        // PERBAIKAN 2: Paksa Canvas Menjadi Portrait Tegak
+        function createStampedImage(desc, nama) {
+            return new Promise((resolve) => {
+                const video = document.getElementById('webcam');
+                const canvas = document.getElementById('canvas');
+                const ctx = canvas.getContext('2d');
+
+                // Deteksi dimensi asli video
+                let vWidth = video.videoWidth || 1080;
+                let vHeight = video.videoHeight || 1920;
+
+                // Jika hardware menangkap gambar Landscape (Lebar > Tinggi), tukar nilainya agar Canvas jadi Portrait
+                if (vWidth > vHeight) {
+                    canvas.width = vHeight;
+                    canvas.height = vWidth;
+                } else {
+                    canvas.width = vWidth;
+                    canvas.height = vHeight;
                 }
-            } catch (e) {
-                currentAddress = `Lat: ${lat.toFixed(4)}, Lng: ${lng.toFixed(4)}`;
-            }
+
+                // Gambar frame video dengan posisi tegak
+                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+
+                // Buat Box Solid Putih di Bagian Bawah
+                const overlayHeight = Math.round(canvas.height * 0.16);
+                ctx.fillStyle = "#ffffff";
+                ctx.fillRect(0, canvas.height - overlayHeight, canvas.width, overlayHeight);
+
+                // Render Teks Watermark
+                const fontSize = Math.round(canvas.height * 0.028);
+                ctx.fillStyle = "#1e293b"; 
+                ctx.font = `bold ${fontSize}px sans-serif`;
+                ctx.textBaseline = "top";
+
+                const paddingX = Math.round(canvas.width * 0.05);
+                const startY = canvas.height - overlayHeight + (overlayHeight * 0.15);
+                const lineSpacing = Math.round(fontSize * 1.45);
+
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString('id-ID', { hour: '2-digit', minute: '2-digit' });
+                const dateStr = now.toLocaleDateString('id-ID', { day: '2-digit', month: 'short', year: 'numeric' });
+
+                ctx.fillText(`👤 Nama: ${nama.toUpperCase()}`, paddingX, startY);
+                ctx.fillText(`📍 Lokasi: ${currentAddress.substring(0, 42)}`, paddingX, startY + lineSpacing);
+                ctx.fillText(`⏰ Waktu: ${timeStr} | ${dateStr}`, paddingX, startY + (lineSpacing * 2));
+
+                resolve(canvas.toDataURL('image/jpeg', 0.9));
+            });
         }
 
         // --- KONTROL KAMERA (ZOOM, FLIP, FLASH) ---
