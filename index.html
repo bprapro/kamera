@@ -8,7 +8,7 @@
     <style>
         body { background-color: #000; color: #fff; overflow: hidden; -webkit-font-smoothing: antialiased; }
         
-        /* Grid Overlay Kamera */
+        /* Grid Overlay Kamera - pointer-events: none agar tidak menghalangi klik */
         .grid-lines { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); pointer-events: none; }
         .grid-lines div { border: 0.5px solid rgba(255, 255, 255, 0.2); }
 
@@ -17,7 +17,6 @@
         .zoom-btn { width: 36px; height: 36px; display: flex; align-items: center; justify-content: center; border-radius: 50%; font-size: 12px; font-weight: bold; transition: all 0.2s; }
         .zoom-active { background-color: rgba(255, 255, 255, 0.2); color: #facc15; border: 1px solid #facc15; }
 
-        /* Custom Scrollbar for Gallery */
         ::-webkit-scrollbar { width: 0px; }
     </style>
 </head>
@@ -36,30 +35,31 @@
         </div>
 
         <!-- TOP BAR UI -->
-        <div class="absolute top-0 left-0 right-0 z-20 p-5 pt-8 bg-gradient-to-b from-black/80 via-black/30 to-transparent flex justify-between items-center text-white">
+        <div class="absolute top-0 left-0 right-0 z-20 p-5 pt-8 bg-gradient-to-b from-black/80 via-black/30 to-transparent flex justify-between items-center text-white pointer-events-auto">
             <button id="btn-flash" onclick="toggleFlash()" class="p-2 rounded-full active:scale-95 text-lg">⚡</button>
             <span class="text-xs font-semibold tracking-wider bg-black/40 px-2.5 py-1 rounded-full border border-white/20">12M</span>
             <button onclick="toggleModal('profil')" class="p-2 text-sm bg-black/40 rounded-full border border-white/20 active:scale-95">👤 Profil</button>
             <button onclick="toggleModal('desc')" class="p-2 text-sm bg-black/40 rounded-full border border-white/20 active:scale-95">📝 Catatan</button>
         </div>
 
-        <!-- BOTTOM CONTROL PANEL UI -->
-        <div class="absolute bottom-0 left-0 right-0 z-20 pb-8 pt-12 bg-gradient-to-t from-black via-black/80 to-transparent flex flex-col items-center gap-5">
+        <!-- BOTTOM CONTROL PANEL UI (pointer-events-none pada kontainer utama) -->
+        <div class="absolute bottom-0 left-0 right-0 z-30 pb-8 pt-12 bg-gradient-to-t from-black via-black/80 to-transparent flex flex-col items-center gap-5 pointer-events-none">
             
-            <div class="zoom-pill flex items-center p-1 gap-1 border border-white/10">
+            <div class="zoom-pill flex items-center p-1 gap-1 border border-white/10 pointer-events-auto">
                 <button onclick="setZoom(0.6, this)" class="zoom-btn text-white/70">.6</button>
                 <button onclick="setZoom(1.0, this)" class="zoom-btn zoom-active">1x</button>
                 <button onclick="setZoom(2.0, this)" class="zoom-btn text-white/70">2</button>
                 <button onclick="setZoom(3.0, this)" class="zoom-btn text-white/70">3</button>
             </div>
 
-            <div class="w-full px-8 flex items-center justify-between">
+            <div class="w-full px-8 flex items-center justify-between pointer-events-auto">
                 <button onclick="openGalleryTab()" class="w-12 h-12 rounded-2xl border border-white/30 overflow-hidden bg-zinc-800/80 flex items-center justify-center active:scale-95 transition">
                     <span class="text-xs text-white">🖼️</span>
                 </button>
 
-                <button onclick="processPhotoWorkflow()" class="w-20 h-20 bg-white rounded-full border-4 border-zinc-400 active:scale-90 transition shadow-2xl flex items-center justify-center">
-                    <div class="w-16 h-16 rounded-full border-2 border-black/10"></div>
+                <!-- TOMBOL SHUTTER DENGAN ONCLICK & ONTOUCHEND -->
+                <button id="shutter-btn" onclick="processPhotoWorkflow()" ontouchend="processPhotoWorkflow()" class="w-20 h-20 bg-white rounded-full border-4 border-zinc-400 active:scale-90 transition shadow-2xl flex items-center justify-center cursor-pointer z-50">
+                    <div class="w-16 h-16 rounded-full border-2 border-black/10 pointer-events-none"></div>
                 </button>
 
                 <button onclick="flipCamera()" class="w-12 h-12 rounded-full bg-zinc-800/80 border border-white/20 flex items-center justify-center text-xl active:rotate-180 transition-transform duration-300">
@@ -67,7 +67,7 @@
                 </button>
             </div>
 
-            <div class="flex justify-center gap-6 text-xs font-bold tracking-widest text-white/60 pt-2">
+            <div class="flex justify-center gap-6 text-xs font-bold tracking-widest text-white/60 pt-2 pointer-events-auto">
                 <span class="hover:text-white cursor-pointer">PORTRAIT</span>
                 <span class="text-yellow-400 border-b-2 border-yellow-400 pb-0.5">PHOTO</span>
                 <span class="hover:text-white cursor-pointer">VIDEO</span>
@@ -103,9 +103,8 @@
         </div>
     </div>
 
-    <!-- GALERI MODERN (DARK UI & KALENDER FILTER) -->
+    <!-- GALERI MODERN -->
     <div id="modal-gallery" class="fixed inset-0 bg-black hidden z-[100] flex flex-col pt-10 px-4 pb-24 overflow-y-auto">
-        <!-- Header Galeri -->
         <div class="flex justify-between items-center py-4 border-b border-zinc-900">
             <div>
                 <h2 class="text-2xl font-bold text-white tracking-tight">Gallery</h2>
@@ -114,7 +113,6 @@
             <button onclick="toggleModal('gallery')" class="text-zinc-400 hover:text-white font-bold bg-zinc-900 p-2 rounded-full">✕</button>
         </div>
 
-        <!-- Gallery Feed Views -->
         <div id="view-feed" class="flex flex-col gap-6 mt-6"></div>
         <div id="view-calendar" class="hidden mt-6">
             <div id="calendar-grid" class="grid grid-cols-7 gap-2"></div>
@@ -122,14 +120,13 @@
 
         <div id="gallery-loading" class="hidden text-center py-16 text-zinc-600 text-xs">Memuat galeri foto...</div>
 
-        <!-- Floating Tab Bar (Navigasi Galeri) -->
         <div class="fixed bottom-6 left-1/2 -translate-x-1/2 bg-zinc-900/90 backdrop-blur-xl border border-white/10 px-6 py-2.5 rounded-full flex gap-8 items-center shadow-2xl z-[120]">
             <button onclick="switchGalleryView('feed')" id="tab-feed" class="text-white text-lg">🏠</button>
             <button onclick="switchGalleryView('calendar')" id="tab-calendar" class="text-zinc-500 text-lg">📅</button>
         </div>
     </div>
 
-    <!-- LIGHTBOX PREVIEW (IMAGE CLICK WITH BLUR BACKGROUND) -->
+    <!-- LIGHTBOX PREVIEW -->
     <div id="modal-preview" class="fixed inset-0 bg-black/70 backdrop-blur-2xl hidden z-[200] flex flex-col items-center justify-between p-6">
         <div class="w-full flex justify-end">
             <button onclick="closePreview()" class="text-white bg-zinc-800/80 p-3 rounded-full text-sm">✕</button>
@@ -152,6 +149,7 @@
         let currentAddress = "Mencari lokasi...";
         let currentZoomLevel = 1.0;
         let galleryData = [];
+        let isProcessing = false;
 
         document.addEventListener('DOMContentLoaded', () => {
             loadProfil();
@@ -244,189 +242,190 @@
             }
         }
 
-        // 1. ALUR SHUTTER DENGAN AMAN & TANPA POP-UP
-        async function processPhotoWorkflow() {
+        // --- ALUR FOTO AMAN DARI DOUBLE CLICK & HIT-TEST ISSUES ---
+        async function processPhotoWorkflow(e) {
+            if (e) { e.preventDefault(); }
+            if (isProcessing) return;
+            isProcessing = true;
+
             const desc = document.getElementById('input-desc').value || "Dokumentasi Pekerjaan";
             const namaField = localStorage.getItem('workcam_nama') || "Heri Prasetyo";
 
             try {
-                // Efek visual klik shutter (Flash singkat)
+                // Flash Efek Layar
                 const video = document.getElementById('webcam');
-                video.classList.add('opacity-40');
-                setTimeout(() => video.classList.remove('opacity-40'), 150);
+                video.classList.add('opacity-30');
+                setTimeout(() => video.classList.remove('opacity-30'), 150);
 
-                // Buat Gambar
                 const stampedBase64 = await createStampedImage(desc, namaField);
-                
-                // Kirim ke Google Drive di latar belakang
                 uploadPhotoToGas(stampedBase64, desc);
             } catch (err) {
                 console.error("Gagal mengambil foto:", err);
-                alert("Terjadi kesalahan saat memotret: " + err.message);
+            } finally {
+                setTimeout(() => { isProcessing = false; }, 800);
             }
         }
 
-        // 2. FUNGSI RENDER WATERMARK TEGAK & ANTI-CRASH
         function createStampedImage(desc, nama) {
-            return new Promise((resolve, reject) => {
-                try {
-                    const video = document.getElementById('webcam');
-                    const canvas = document.getElementById('canvas');
-                    const ctx = canvas.getContext('2d');
+            return new Promise((resolve) => {
+                const video = document.getElementById('webcam');
+                const canvas = document.getElementById('canvas');
+                const ctx = canvas.getContext('2d');
 
-                    if (!video || video.readyState !== 4) {
-                        reject("Kamera belum siap");
-                        return;
-                    }
+                let vW = video.videoWidth || 1080;
+                let vH = video.videoHeight || 1920;
 
-                    let vW = video.videoWidth || 1080;
-                    let vH = video.videoHeight || 1920;
+                const targetW = 1080;
+                const targetH = 1440;
+                canvas.width = targetW;
+                canvas.height = targetH;
 
-                    // PAKSA KANVAS SELALU PORTRAIT (1080 x 1440)
-                    const targetW = 1080;
-                    const targetH = 1440;
-                    canvas.width = targetW;
-                    canvas.height = targetH;
-
-                    ctx.save();
-                    // Putar 90 derajat jika sensor kamera HP mengirim sinyal Landscape (vW > vH)
-                    if (vW > vH) {
-                        ctx.translate(targetW / 2, targetH / 2);
-                        ctx.rotate(90 * Math.PI / 180);
-                        ctx.drawImage(video, -targetH / 2, -targetW / 2, targetH, targetW);
-                    } else {
-                        ctx.drawImage(video, 0, 0, targetW, targetH);
-                    }
-                    ctx.restore();
-
-                    // MENGGAMBAR KARTU WHITE CARD
-                    const cardMargin = 40;
-                    const cardW = targetW - (cardMargin * 2);
-                    const cardH = 320;
-                    const cardX = cardMargin;
-                    const cardY = targetH - cardH - 120;
-
-                    // Ground Shadow & White Box
-                    ctx.save();
-                    ctx.shadowColor = "rgba(0, 0, 0, 0.25)";
-                    ctx.shadowBlur = 25;
-                    ctx.shadowOffsetY = 10;
-                    ctx.fillStyle = "#ffffff";
-                    
-                    // Fallback jika browser tidak mendukung roundRect
-                    if (ctx.roundRect) {
-                        ctx.beginPath();
-                        ctx.roundRect(cardX, cardY, cardW, cardH, 30);
-                        ctx.fill();
-                    } else {
-                        ctx.fillRect(cardX, cardY, cardW, cardH);
-                    }
-                    ctx.restore();
-
-                    // A. Render Peta Mini
-                    const mapMargin = 25;
-                    const mapSize = 130;
-                    const mapX = cardX + mapMargin;
-                    const mapY = cardY + mapMargin;
-
-                    ctx.fillStyle = "#e5e7eb";
-                    if (ctx.roundRect) {
-                        ctx.beginPath();
-                        ctx.roundRect(mapX, mapY, mapSize, mapSize, 20);
-                        ctx.fill();
-                    } else {
-                        ctx.fillRect(mapX, mapY, mapSize, mapSize);
-                    }
-
-                    // Jalanan Peta
-                    ctx.strokeStyle = "#ffffff";
-                    ctx.lineWidth = 12;
-                    ctx.beginPath();
-                    ctx.moveTo(mapX, mapY + 65);
-                    ctx.lineTo(mapX + mapSize, mapY + 65);
-                    ctx.moveTo(mapX + 65, mapY);
-                    ctx.lineTo(mapX + 65, mapY + mapSize);
-                    ctx.stroke();
-
-                    // Pin Merah
-                    ctx.fillStyle = "#ef4444";
-                    ctx.beginPath();
-                    ctx.arc(mapX + 65, mapY + 50, 16, 0, Math.PI * 2);
-                    ctx.fill();
-
-                    // B. Render Teks Alamat & Lat/Long
-                    const textX = mapX + mapSize + 25;
-                    let currentY = mapY + 20;
-
-                    const safeAddress = currentAddress || "Lokasi tidak terdeteksi";
-                    const safeCoords = currentCoords || "-6.9666, 110.4166";
-
-                    ctx.fillStyle = "#0f172a";
-                    ctx.font = "bold 28px sans-serif";
-                    ctx.textBaseline = "top";
-                    
-                    const shortAddress = safeAddress.length > 30 ? safeAddress.substring(0, 30) + "..." : safeAddress;
-                    ctx.fillText(shortAddress, textX, currentY);
-
-                    currentY += 42;
-                    ctx.fillStyle = "#64748b";
-                    ctx.font = "22px sans-serif";
-                    ctx.fillText(`Lat: ${safeCoords.split(',')[0]}, Long: ${safeCoords.split(',')[1] || ''}`, textX, currentY);
-
-                    // C. Garis Pembatas
-                    const dividerY = mapY + mapSize + 20;
-                    ctx.strokeStyle = "#f1f5f9";
-                    ctx.lineWidth = 2;
-                    ctx.beginPath();
-                    ctx.moveTo(cardX + mapMargin, dividerY);
-                    ctx.lineTo(cardX + cardW - mapMargin, dividerY);
-                    ctx.stroke();
-
-                    // D. Jam & Kompas
-                    const now = new Date();
-                    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-                    const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit', weekday: 'short' });
-
-                    const col1X = cardX + mapMargin;
-                    const col2X = cardX + (cardW / 2) + 10;
-                    const bottomY = dividerY + 18;
-
-                    // Ikon Jam
-                    ctx.fillStyle = "#2563eb";
-                    ctx.beginPath();
-                    ctx.arc(col1X + 20, bottomY + 20, 20, 0, Math.PI * 2);
-                    ctx.fill();
-
-                    ctx.fillStyle = "#2563eb";
-                    ctx.font = "bold 30px sans-serif";
-                    ctx.fillText(timeStr, col1X + 52, bottomY - 2);
-
-                    ctx.fillStyle = "#64748b";
-                    ctx.font = "18px sans-serif";
-                    ctx.fillText(dateStr, col1X + 52, bottomY + 32);
-
-                    // Ikon Kompas
-                    ctx.fillStyle = "#2563eb";
-                    ctx.beginPath();
-                    ctx.arc(col2X + 20, bottomY + 20, 20, 0, Math.PI * 2);
-                    ctx.fill();
-
-                    ctx.fillStyle = "#2563eb";
-                    ctx.font = "bold 30px sans-serif";
-                    ctx.fillText("337°", col2X + 52, bottomY - 2);
-
-                    ctx.fillStyle = "#64748b";
-                    ctx.font = "18px sans-serif";
-                    ctx.fillText("NorthEast", col2X + 52, bottomY + 32);
-
-                    resolve(canvas.toDataURL('image/jpeg', 0.92));
-                } catch (e) {
-                    reject(e);
+                ctx.save();
+                if (vW > vH) {
+                    ctx.translate(targetW / 2, targetH / 2);
+                    ctx.rotate(90 * Math.PI / 180);
+                    ctx.drawImage(video, -targetH / 2, -targetW / 2, targetH, targetW);
+                } else {
+                    ctx.drawImage(video, 0, 0, targetW, targetH);
                 }
+                ctx.restore();
+
+                // Watermark Card (Presisi Referensi)
+                const cardMargin = 40;
+                const cardW = targetW - (cardMargin * 2);
+                const cardH = 320;
+                const cardX = cardMargin;
+                const cardY = targetH - cardH - 120;
+
+                ctx.save();
+                ctx.shadowColor = "rgba(0, 0, 0, 0.25)";
+                ctx.shadowBlur = 25;
+                ctx.shadowOffsetY = 10;
+                ctx.fillStyle = "#ffffff";
+                
+                if (ctx.roundRect) {
+                    ctx.beginPath();
+                    ctx.roundRect(cardX, cardY, cardW, cardH, 30);
+                    ctx.fill();
+                } else {
+                    ctx.fillRect(cardX, cardY, cardW, cardH);
+                }
+                ctx.restore();
+
+                const mapMargin = 25;
+                const mapSize = 130;
+                const mapX = cardX + mapMargin;
+                const mapY = cardY + mapMargin;
+
+                ctx.fillStyle = "#e5e7eb";
+                if (ctx.roundRect) {
+                    ctx.beginPath();
+                    ctx.roundRect(mapX, mapY, mapSize, mapSize, 20);
+                    ctx.fill();
+                } else {
+                    ctx.fillRect(mapX, mapY, mapSize, mapSize);
+                }
+
+                ctx.strokeStyle = "#ffffff";
+                ctx.lineWidth = 12;
+                ctx.beginPath();
+                ctx.moveTo(mapX, mapY + 65);
+                ctx.lineTo(mapX + mapSize, mapY + 65);
+                ctx.moveTo(mapX + 65, mapY);
+                ctx.lineTo(mapX + 65, mapY + mapSize);
+                ctx.stroke();
+
+                ctx.fillStyle = "#ef4444";
+                ctx.beginPath();
+                ctx.arc(mapX + 65, mapY + 50, 16, 0, Math.PI * 2);
+                ctx.fill();
+
+                const textX = mapX + mapSize + 25;
+                let currentY = mapY + 20;
+
+                const safeAddress = currentAddress || "Lokasi tidak terdeteksi";
+                const safeCoords = currentCoords || "-6.9666, 110.4166";
+
+                ctx.fillStyle = "#0f172a";
+                ctx.font = "bold 28px sans-serif";
+                ctx.textBaseline = "top";
+                
+                const shortAddress = safeAddress.length > 30 ? safeAddress.substring(0, 30) + "..." : safeAddress;
+                ctx.fillText(shortAddress, textX, currentY);
+
+                currentY += 42;
+                ctx.fillStyle = "#64748b";
+                ctx.font = "22px sans-serif";
+                ctx.fillText(`Lat: ${safeCoords.split(',')[0]}, Long: ${safeCoords.split(',')[1] || ''}`, textX, currentY);
+
+                const dividerY = mapY + mapSize + 20;
+                ctx.strokeStyle = "#f1f5f9";
+                ctx.lineWidth = 2;
+                ctx.beginPath();
+                ctx.moveTo(cardX + mapMargin, dividerY);
+                ctx.lineTo(cardX + cardW - mapMargin, dividerY);
+                ctx.stroke();
+
+                const now = new Date();
+                const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit', weekday: 'short' });
+
+                const col1X = cardX + mapMargin;
+                const col2X = cardX + (cardW / 2) + 10;
+                const bottomY = dividerY + 18;
+
+                ctx.fillStyle = "#2563eb";
+                ctx.beginPath();
+                ctx.arc(col1X + 20, bottomY + 20, 20, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = "#2563eb";
+                ctx.font = "bold 30px sans-serif";
+                ctx.fillText(timeStr, col1X + 52, bottomY - 2);
+
+                ctx.fillStyle = "#64748b";
+                ctx.font = "18px sans-serif";
+                ctx.fillText(dateStr, col1X + 52, bottomY + 32);
+
+                ctx.fillStyle = "#2563eb";
+                ctx.beginPath();
+                ctx.arc(col2X + 20, bottomY + 20, 20, 0, Math.PI * 2);
+                ctx.fill();
+
+                ctx.fillStyle = "#2563eb";
+                ctx.font = "bold 30px sans-serif";
+                ctx.fillText("337°", col2X + 52, bottomY - 2);
+
+                ctx.fillStyle = "#64748b";
+                ctx.font = "18px sans-serif";
+                ctx.fillText("NorthEast", col2X + 52, bottomY + 32);
+
+                resolve(canvas.toDataURL('image/jpeg', 0.92));
             });
         }
 
-        // --- MANAJEMEN GALERI SAMA DENGAN DESAIN UI ---
+        async function uploadPhotoToGas(base64Image, desc) {
+            if (!GAS_URL) return;
+            const dateKey = new Date().toISOString().split('T')[0];
+            try {
+                await fetch(GAS_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({
+                        image: base64Image,
+                        date: dateKey,
+                        fullTimestamp: new Date().toLocaleString('id-ID'),
+                        location: currentAddress || "",
+                        coords: currentCoords || "",
+                        description: desc || ""
+                    })
+                });
+            } catch (err) {
+                console.error("Gagal unggah:", err);
+            }
+        }
+
         function openGalleryTab() {
             toggleModal('gallery');
             fetchGalleryData();
@@ -448,34 +447,7 @@
                 renderGalleryCalendar(galleryData);
             } catch (err) {
                 loading.classList.add('hidden');
-                feed.innerHTML = `<div class="text-center py-10 text-zinc-600 text-xs">Gagal memuat arsip foto.</div>`;
-            }
-        }
-        // FUNGSI UNTUK MENGIRIM HASIL FOTO KE GOOGLE DRIVE / GAS
-        async function uploadPhotoToGas(base64Image, desc) {
-            if (!GAS_URL || GAS_URL === "") {
-                console.warn("GAS_URL belum diatur.");
-                return;
-            }
-
-            const dateKey = new Date().toISOString().split('T')[0];
-            try {
-                await fetch(GAS_URL, {
-                    method: 'POST',
-                    mode: 'no-cors',
-                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
-                    body: JSON.stringify({
-                        image: base64Image,
-                        date: dateKey,
-                        fullTimestamp: new Date().toLocaleString('id-ID'),
-                        location: currentAddress || "",
-                        coords: currentCoords || "",
-                        description: desc || ""
-                    })
-                });
-                console.log("Foto berhasil dikirim di latar belakang.");
-            } catch (err) {
-                console.error("Gagal mengunggah foto ke Google Drive:", err);
+                feed.innerHTML = `<div class="text-center py-10 text-zinc-600 text-xs">Gagal memuat galeri.</div>`;
             }
         }
 
@@ -488,7 +460,6 @@
                 return;
             }
 
-            // Kelompokkan foto berdasarkan Tanggal (Group Feed)
             const groups = {};
             data.forEach(item => {
                 const key = item.date || "Terbaru";
@@ -498,7 +469,7 @@
 
             for (const [dateGroup, items] of Object.entries(groups)) {
                 let html = `<div><h3 class="text-sm font-semibold text-zinc-400 mb-3">${dateGroup}</h3><div class="grid grid-cols-4 gap-2.5">`;
-                items.forEach((item, idx) => {
+                items.forEach((item) => {
                     html += `
                         <div onclick="openPreview('${item.url}', '${item.date}', '${item.description}')" class="aspect-square bg-zinc-900 rounded-2xl overflow-hidden border border-white/5 active:scale-95 transition cursor-pointer relative">
                             <img src="${item.url}" class="w-full h-full object-cover">
@@ -513,7 +484,6 @@
             const calendarGrid = document.getElementById('calendar-grid');
             calendarGrid.innerHTML = "";
 
-            // Buat Grid Tanggal 1 s.d 31 Bulan Berjalan
             const mapPhotoByDay = {};
             data.forEach(item => {
                 if (item.date) {
@@ -558,7 +528,6 @@
             }
         }
 
-        // --- LIGHTBOX PREVIEW (IMAGE CLICK) ---
         function openPreview(url, date, desc) {
             document.getElementById('preview-img').src = url;
             document.getElementById('preview-date').innerText = date || "";
