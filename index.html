@@ -244,161 +244,185 @@
             }
         }
 
-        // --- PROSES AMBIL FOTO TANPA POP-UP ---
+        // 1. ALUR SHUTTER DENGAN AMAN & TANPA POP-UP
         async function processPhotoWorkflow() {
             const desc = document.getElementById('input-desc').value || "Dokumentasi Pekerjaan";
             const namaField = localStorage.getItem('workcam_nama') || "Heri Prasetyo";
 
             try {
+                // Efek visual klik shutter (Flash singkat)
+                const video = document.getElementById('webcam');
+                video.classList.add('opacity-40');
+                setTimeout(() => video.classList.remove('opacity-40'), 150);
+
+                // Buat Gambar
                 const stampedBase64 = await createStampedImage(desc, namaField);
-                uploadPhotoToGas(stampedBase64, desc); // Async background save
+                
+                // Kirim ke Google Drive di latar belakang
+                uploadPhotoToGas(stampedBase64, desc);
             } catch (err) {
                 console.error("Gagal mengambil foto:", err);
+                alert("Terjadi kesalahan saat memotret: " + err.message);
             }
         }
 
+        // 2. FUNGSI RENDER WATERMARK TEGAK & ANTI-CRASH
         function createStampedImage(desc, nama) {
-            return new Promise((resolve) => {
-                const video = document.getElementById('webcam');
-                const canvas = document.getElementById('canvas');
-                const ctx = canvas.getContext('2d');
+            return new Promise((resolve, reject) => {
+                try {
+                    const video = document.getElementById('webcam');
+                    const canvas = document.getElementById('canvas');
+                    const ctx = canvas.getContext('2d');
 
-                let vW = video.videoWidth || 1080;
-                let vH = video.videoHeight || 1920;
+                    if (!video || video.readyState !== 4) {
+                        reject("Kamera belum siap");
+                        return;
+                    }
 
-                // 1. SETTING KANVAS PORTRAIT TEGAK (1080 x 1440)
-                const targetW = 1080;
-                const targetH = 1440;
-                canvas.width = targetW;
-                canvas.height = targetH;
+                    let vW = video.videoWidth || 1080;
+                    let vH = video.videoHeight || 1920;
 
-                ctx.save();
+                    // PAKSA KANVAS SELALU PORTRAIT (1080 x 1440)
+                    const targetW = 1080;
+                    const targetH = 1440;
+                    canvas.width = targetW;
+                    canvas.height = targetH;
 
-                // 2. LOGIKA ROTASI AGAR FOTO SELALU TEGAK (PORTRAIT)
-                // Jika hardware kamera HP mengirim sinyal Landscape (vW > vH)
-                if (vW > vH) {
-                    ctx.translate(targetW / 2, targetH / 2);
-                    ctx.rotate(90 * Math.PI / 180); // Putar 90 Derajat
-                    ctx.drawImage(video, -targetH / 2, -targetW / 2, targetH, targetW);
-                } else {
-                    ctx.drawImage(video, 0, 0, targetW, targetH);
+                    ctx.save();
+                    // Putar 90 derajat jika sensor kamera HP mengirim sinyal Landscape (vW > vH)
+                    if (vW > vH) {
+                        ctx.translate(targetW / 2, targetH / 2);
+                        ctx.rotate(90 * Math.PI / 180);
+                        ctx.drawImage(video, -targetH / 2, -targetW / 2, targetH, targetW);
+                    } else {
+                        ctx.drawImage(video, 0, 0, targetW, targetH);
+                    }
+                    ctx.restore();
+
+                    // MENGGAMBAR KARTU WHITE CARD
+                    const cardMargin = 40;
+                    const cardW = targetW - (cardMargin * 2);
+                    const cardH = 320;
+                    const cardX = cardMargin;
+                    const cardY = targetH - cardH - 120;
+
+                    // Ground Shadow & White Box
+                    ctx.save();
+                    ctx.shadowColor = "rgba(0, 0, 0, 0.25)";
+                    ctx.shadowBlur = 25;
+                    ctx.shadowOffsetY = 10;
+                    ctx.fillStyle = "#ffffff";
+                    
+                    // Fallback jika browser tidak mendukung roundRect
+                    if (ctx.roundRect) {
+                        ctx.beginPath();
+                        ctx.roundRect(cardX, cardY, cardW, cardH, 30);
+                        ctx.fill();
+                    } else {
+                        ctx.fillRect(cardX, cardY, cardW, cardH);
+                    }
+                    ctx.restore();
+
+                    // A. Render Peta Mini
+                    const mapMargin = 25;
+                    const mapSize = 130;
+                    const mapX = cardX + mapMargin;
+                    const mapY = cardY + mapMargin;
+
+                    ctx.fillStyle = "#e5e7eb";
+                    if (ctx.roundRect) {
+                        ctx.beginPath();
+                        ctx.roundRect(mapX, mapY, mapSize, mapSize, 20);
+                        ctx.fill();
+                    } else {
+                        ctx.fillRect(mapX, mapY, mapSize, mapSize);
+                    }
+
+                    // Jalanan Peta
+                    ctx.strokeStyle = "#ffffff";
+                    ctx.lineWidth = 12;
+                    ctx.beginPath();
+                    ctx.moveTo(mapX, mapY + 65);
+                    ctx.lineTo(mapX + mapSize, mapY + 65);
+                    ctx.moveTo(mapX + 65, mapY);
+                    ctx.lineTo(mapX + 65, mapY + mapSize);
+                    ctx.stroke();
+
+                    // Pin Merah
+                    ctx.fillStyle = "#ef4444";
+                    ctx.beginPath();
+                    ctx.arc(mapX + 65, mapY + 50, 16, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    // B. Render Teks Alamat & Lat/Long
+                    const textX = mapX + mapSize + 25;
+                    let currentY = mapY + 20;
+
+                    const safeAddress = currentAddress || "Lokasi tidak terdeteksi";
+                    const safeCoords = currentCoords || "-6.9666, 110.4166";
+
+                    ctx.fillStyle = "#0f172a";
+                    ctx.font = "bold 28px sans-serif";
+                    ctx.textBaseline = "top";
+                    
+                    const shortAddress = safeAddress.length > 30 ? safeAddress.substring(0, 30) + "..." : safeAddress;
+                    ctx.fillText(shortAddress, textX, currentY);
+
+                    currentY += 42;
+                    ctx.fillStyle = "#64748b";
+                    ctx.font = "22px sans-serif";
+                    ctx.fillText(`Lat: ${safeCoords.split(',')[0]}, Long: ${safeCoords.split(',')[1] || ''}`, textX, currentY);
+
+                    // C. Garis Pembatas
+                    const dividerY = mapY + mapSize + 20;
+                    ctx.strokeStyle = "#f1f5f9";
+                    ctx.lineWidth = 2;
+                    ctx.beginPath();
+                    ctx.moveTo(cardX + mapMargin, dividerY);
+                    ctx.lineTo(cardX + cardW - mapMargin, dividerY);
+                    ctx.stroke();
+
+                    // D. Jam & Kompas
+                    const now = new Date();
+                    const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+                    const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit', weekday: 'short' });
+
+                    const col1X = cardX + mapMargin;
+                    const col2X = cardX + (cardW / 2) + 10;
+                    const bottomY = dividerY + 18;
+
+                    // Ikon Jam
+                    ctx.fillStyle = "#2563eb";
+                    ctx.beginPath();
+                    ctx.arc(col1X + 20, bottomY + 20, 20, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = "#2563eb";
+                    ctx.font = "bold 30px sans-serif";
+                    ctx.fillText(timeStr, col1X + 52, bottomY - 2);
+
+                    ctx.fillStyle = "#64748b";
+                    ctx.font = "18px sans-serif";
+                    ctx.fillText(dateStr, col1X + 52, bottomY + 32);
+
+                    // Ikon Kompas
+                    ctx.fillStyle = "#2563eb";
+                    ctx.beginPath();
+                    ctx.arc(col2X + 20, bottomY + 20, 20, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.fillStyle = "#2563eb";
+                    ctx.font = "bold 30px sans-serif";
+                    ctx.fillText("337°", col2X + 52, bottomY - 2);
+
+                    ctx.fillStyle = "#64748b";
+                    ctx.font = "18px sans-serif";
+                    ctx.fillText("NorthEast", col2X + 52, bottomY + 32);
+
+                    resolve(canvas.toDataURL('image/jpeg', 0.92));
+                } catch (e) {
+                    reject(e);
                 }
-                ctx.restore();
-
-                // 3. RENDER KARTU WATERMARK WHITE CARD (SESUAI REFERENSI)
-                const cardMargin = 40;
-                const cardW = targetW - (cardMargin * 2);
-                const cardH = 320;
-                const cardX = cardMargin;
-                const cardY = targetH - cardH - 120; // Melayang di atas navigasi bawah
-                const radius = 30;
-
-                // Ground Shadow & White Box
-                ctx.save();
-                ctx.shadowColor = "rgba(0, 0, 0, 0.25)";
-                ctx.shadowBlur = 25;
-                ctx.shadowOffsetY = 10;
-                ctx.fillStyle = "#ffffff";
-                ctx.beginPath();
-                ctx.roundRect(cardX, cardY, cardW, cardH, radius);
-                ctx.fill();
-                ctx.restore();
-
-                // A. Render Peta Mini (Sisi Kiri Atas Kartu)
-                const mapMargin = 25;
-                const mapSize = 130;
-                const mapX = cardX + mapMargin;
-                const mapY = cardY + mapMargin;
-
-                // Peta BG
-                ctx.fillStyle = "#e5e7eb";
-                ctx.beginPath();
-                ctx.roundRect(mapX, mapY, mapSize, mapSize, 20);
-                ctx.fill();
-
-                // Jalanan Peta
-                ctx.strokeStyle = "#ffffff";
-                ctx.lineWidth = 12;
-                ctx.beginPath();
-                ctx.moveTo(mapX, mapY + 65);
-                ctx.lineTo(mapX + mapSize, mapY + 65);
-                ctx.moveTo(mapX + 65, mapY);
-                ctx.lineTo(mapX + 65, mapY + mapSize);
-                ctx.stroke();
-
-                // Red Map Pin
-                ctx.fillStyle = "#ef4444";
-                ctx.beginPath();
-                ctx.arc(mapX + 65, mapY + 50, 16, 0, Math.PI * 2);
-                ctx.fill();
-
-                // B. Render Teks Alamat & Lat/Long
-                const textX = mapX + mapSize + 25;
-                let currentY = mapY + 20;
-
-                ctx.fillStyle = "#0f172a";
-                ctx.font = "bold 28px sans-serif";
-                ctx.textBaseline = "top";
-                
-                // Potong teks alamat jika terlalu panjang
-                const shortAddress = currentAddress.length > 32 ? currentAddress.substring(0, 32) + "..." : currentAddress;
-                ctx.fillText(shortAddress, textX, currentY);
-
-                currentY += 42;
-                ctx.fillStyle = "#64748b";
-                ctx.font = "22px sans-serif";
-                const coordsText = currentCoords ? `Lat: ${currentCoords.split(',')[0]}, Long: ${currentCoords.split(',')[1]}` : "Lat: -6.9666, Long: 110.4166";
-                ctx.fillText(coordsText, textX, currentY);
-
-                // C. Garis Pembatas Horisontal
-                const dividerY = mapY + mapSize + 20;
-                ctx.strokeStyle = "#f1f5f9";
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.moveTo(cardX + mapMargin, dividerY);
-                ctx.lineTo(cardX + cardW - mapMargin, dividerY);
-                ctx.stroke();
-
-                // D. Section Bawah: Jam & Kompas (Sesuai Referensi)
-                const now = new Date();
-                const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-                const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit', weekday: 'short' });
-
-                const col1X = cardX + mapMargin;
-                const col2X = cardX + (cardW / 2) + 10;
-                const bottomY = dividerY + 18;
-
-                // Ikon Jam (Lingkaran Biru)
-                ctx.fillStyle = "#2563eb";
-                ctx.beginPath();
-                ctx.arc(col1X + 20, bottomY + 20, 20, 0, Math.PI * 2);
-                ctx.fill();
-
-                // Teks Jam & Tanggal
-                ctx.fillStyle = "#2563eb";
-                ctx.font = "bold 30px sans-serif";
-                ctx.fillText(timeStr, col1X + 52, bottomY - 2);
-
-                ctx.fillStyle = "#64748b";
-                ctx.font = "18px sans-serif";
-                ctx.fillText(dateStr, col1X + 52, bottomY + 32);
-
-                // Ikon Kompas (Lingkaran Biru)
-                ctx.fillStyle = "#2563eb";
-                ctx.beginPath();
-                ctx.arc(col2X + 20, bottomY + 20, 20, 0, Math.PI * 2);
-                ctx.fill();
-
-                // Teks Kompas & Mata Angin
-                ctx.fillStyle = "#2563eb";
-                ctx.font = "bold 30px sans-serif";
-                ctx.fillText("337°", col2X + 52, bottomY - 2);
-
-                ctx.fillStyle = "#64748b";
-                ctx.font = "18px sans-serif";
-                ctx.fillText("NorthEast", col2X + 52, bottomY + 32);
-
-                resolve(canvas.toDataURL('image/jpeg', 0.92));
             });
         }
 
