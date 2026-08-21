@@ -126,7 +126,7 @@
         </div>
     </div>
 
-    <!-- LIGHTBOX PREVIEW WITH SWIPE SUPPORT -->
+    <!-- LIGHTBOX PREVIEW DENGAN FITUR SWIPE -->
     <div id="modal-preview" class="fixed inset-0 bg-black/90 backdrop-blur-2xl hidden z-[200] flex flex-col justify-between p-6">
         <div class="w-full flex justify-between items-center">
             <span id="preview-index" class="text-xs text-zinc-400 font-mono">1 / 1</span>
@@ -134,12 +134,10 @@
         </div>
 
         <div id="swipe-area" class="relative w-full max-w-md my-auto flex items-center justify-center touch-pan-y">
-            <!-- Navigasi Panah Kiri -->
             <button onclick="prevPhoto()" class="absolute left-2 z-10 bg-black/40 text-white w-10 h-10 rounded-full flex items-center justify-center text-xl backdrop-blur-md border border-white/10 active:scale-90">‹</button>
 
             <img id="preview-img" src="" class="max-h-[70vh] w-auto rounded-3xl object-contain shadow-2xl border border-white/10 transition-transform duration-200">
 
-            <!-- Navigasi Panah Kanan -->
             <button onclick="nextPhoto()" class="absolute right-2 z-10 bg-black/40 text-white w-10 h-10 rounded-full flex items-center justify-center text-xl backdrop-blur-md border border-white/10 active:scale-90">›</button>
         </div>
 
@@ -162,7 +160,6 @@
         let currentIndex = 0;
         let isProcessing = false;
 
-        // Variabel untuk Deteksi Gesture Swipe
         let touchStartX = 0;
         let touchEndX = 0;
 
@@ -172,24 +169,26 @@
             setupSwipeListener();
         });
 
-        // 1. KAMERA ON & OFF AUTOMATION
+        // 1. KAMERA ON & OFF + DETEKSI ORIENTASI NORMAL
         async function initCameraAndGps() {
             try {
-                stopCamera(); // Pastikan mati sebelum dinyalakan ulang
+                stopCamera(); 
 
                 mediaStream = await navigator.mediaDevices.getUserMedia({ 
                     video: { 
                         facingMode: currentFacingMode, 
                         width: { ideal: 1080 }, 
                         height: { ideal: 1920 },
-                        aspectRatio: { ideal: 0.5625 }
+                        aspectRatio: { ideal: 0.5625 } // Bebas rotasi paksa (9:16)
                     } 
                 });
 
                 const video = document.getElementById('webcam');
-                video.srcObject = mediaStream;
-                videoTrack = mediaStream.getVideoTracks()[0];
-                applyZoom(currentZoomLevel);
+                if (video) {
+                    video.srcObject = mediaStream;
+                    videoTrack = mediaStream.getVideoTracks()[0];
+                    applyZoom(currentZoomLevel);
+                }
             } catch (err) {
                 console.warn("Gagal mengakses kamera:", err.message);
             }
@@ -270,7 +269,7 @@
             }
         }
 
-        // 2. SHUTTER & PROCESS FOTO
+        // 2. PROCESS FOTO APA ADANYA
         async function processPhotoWorkflow(e) {
             if (e) { e.preventDefault(); }
             if (isProcessing) return;
@@ -304,9 +303,10 @@
                 canvas.width = targetW;
                 canvas.height = targetH;
 
+                // Menggambar langsung tanpa pemutaran kanvas manual
                 ctx.drawImage(video, 0, 0, targetW, targetH);
 
-                // Watermark Card
+                // Watermark Card Overlay
                 const cardMargin = 40;
                 const cardW = targetW - (cardMargin * 2);
                 const cardH = 320;
@@ -347,8 +347,6 @@
                 ctx.beginPath();
                 ctx.moveTo(mapX, mapY + 65);
                 ctx.lineTo(mapX + mapSize, mapY + 65);
-                ctx.moveTo(mapX + 65, mapY);
-                ctx.lineTo(mapX + 65, mapY + mapSize);
                 ctx.stroke();
 
                 ctx.fillStyle = "#ef4444";
@@ -442,16 +440,16 @@
             }
         }
 
-        // 3. FITUR GALERI & MATIKAN/HIDUPKAN KAMERA AUTOMATIS
+        // 3. GALERI & OFF/ON KAMERA
         function openGalleryTab() {
-            stopCamera(); // <-- KAMERA MATI SAAT BUKA GALERI
+            stopCamera(); // Kamera mati saat galeri dibuka
             document.getElementById('modal-gallery').classList.remove('hidden');
             fetchGalleryData();
         }
 
         function closeGalleryTab() {
             document.getElementById('modal-gallery').classList.add('hidden');
-            initCameraAndGps(); // <-- KAMERA HIDUP KEMBALI SAAT GALERI DITUTUP
+            initCameraAndGps(); // Kamera hidup kembali saat galeri ditutup
         }
 
         async function fetchGalleryData() {
@@ -485,7 +483,7 @@
 
             const groups = {};
             data.forEach((item, idx) => {
-                item.globalIndex = idx; // Simpan indeks global
+                item.globalIndex = idx;
                 const key = item.date || "Terbaru";
                 if (!groups[key]) groups[key] = [];
                 groups[key].push(item);
@@ -553,7 +551,7 @@
             }
         }
 
-        // 4. PREVIEW FOTO DENGAN SWIPE & INDEKS
+        // 4. LIGHTBOX & SWIPE SYSTEM
         function openPreviewByIndex(index) {
             if (!galleryData || galleryData.length === 0) return;
             currentIndex = index;
@@ -589,7 +587,6 @@
             document.getElementById('modal-preview').classList.add('hidden');
         }
 
-        // SWIPE GESTURE DETECTOR
         function setupSwipeListener() {
             const area = document.getElementById('swipe-area');
 
@@ -605,13 +602,11 @@
 
         function handleSwipeGesture() {
             const swipeDistance = touchEndX - touchStartX;
-            const threshold = 50; // Jarak minimal geser (px)
+            const threshold = 50;
 
             if (swipeDistance < -threshold) {
-                // Swipe Kiri -> Foto Selanjutnya
                 nextPhoto();
             } else if (swipeDistance > threshold) {
-                // Swipe Kanan -> Foto Sebelumnya
                 prevPhoto();
             }
         }
