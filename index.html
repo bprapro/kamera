@@ -451,6 +451,33 @@
                 feed.innerHTML = `<div class="text-center py-10 text-zinc-600 text-xs">Gagal memuat arsip foto.</div>`;
             }
         }
+        // FUNGSI UNTUK MENGIRIM HASIL FOTO KE GOOGLE DRIVE / GAS
+        async function uploadPhotoToGas(base64Image, desc) {
+            if (!GAS_URL || GAS_URL === "") {
+                console.warn("GAS_URL belum diatur.");
+                return;
+            }
+
+            const dateKey = new Date().toISOString().split('T')[0];
+            try {
+                await fetch(GAS_URL, {
+                    method: 'POST',
+                    mode: 'no-cors',
+                    headers: { 'Content-Type': 'text/plain;charset=utf-8' },
+                    body: JSON.stringify({
+                        image: base64Image,
+                        date: dateKey,
+                        fullTimestamp: new Date().toLocaleString('id-ID'),
+                        location: currentAddress || "",
+                        coords: currentCoords || "",
+                        description: desc || ""
+                    })
+                });
+                console.log("Foto berhasil dikirim di latar belakang.");
+            } catch (err) {
+                console.error("Gagal mengunggah foto ke Google Drive:", err);
+            }
+        }
 
         function renderGalleryFeed(data) {
             const feed = document.getElementById('view-feed');
