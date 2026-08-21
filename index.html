@@ -8,7 +8,7 @@
     <style>
         body { background-color: #000; color: #fff; overflow: hidden; -webkit-font-smoothing: antialiased; }
         
-        /* Grid Overlay Kamera - pointer-events: none agar tidak menghalangi klik */
+        /* Grid Overlay Kamera - pointer-events: none agar tidak menghalangi klik shutter */
         .grid-lines { display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(3, 1fr); pointer-events: none; }
         .grid-lines div { border: 0.5px solid rgba(255, 255, 255, 0.2); }
 
@@ -22,10 +22,11 @@
 </head>
 <body class="font-sans h-screen w-screen relative select-none">
 
-    <!-- CAMERA CONTAINER -->
+    <!-- CAMERA CONTAINER (Tampilan Apa Adanya & Tidak Cropped) -->
     <div class="relative w-full h-full bg-black overflow-hidden flex items-center justify-center">
         
-        <video id="webcam" autoplay playsinline class="w-full h-full object-cover transition-transform duration-300"></video>
+        <!-- object-contain membuat video tidak ter-crop / tidak ter-zoom paksa -->
+        <video id="webcam" autoplay playsinline class="w-full h-full object-contain transition-transform duration-300"></video>
         <canvas id="canvas" class="hidden"></canvas>
 
         <div class="absolute inset-0 grid-lines z-10">
@@ -37,12 +38,12 @@
         <!-- TOP BAR UI -->
         <div class="absolute top-0 left-0 right-0 z-20 p-5 pt-8 bg-gradient-to-b from-black/80 via-black/30 to-transparent flex justify-between items-center text-white pointer-events-auto">
             <button id="btn-flash" onclick="toggleFlash()" class="p-2 rounded-full active:scale-95 text-lg">⚡</button>
-            <span class="text-xs font-semibold tracking-wider bg-black/40 px-2.5 py-1 rounded-full border border-white/20">12M</span>
+            <span class="text-xs font-semibold tracking-wider bg-black/40 px-2.5 py-1 rounded-full border border-white/20">16:9</span>
             <button onclick="toggleModal('profil')" class="p-2 text-sm bg-black/40 rounded-full border border-white/20 active:scale-95">👤 Profil</button>
             <button onclick="toggleModal('desc')" class="p-2 text-sm bg-black/40 rounded-full border border-white/20 active:scale-95">📝 Catatan</button>
         </div>
 
-        <!-- BOTTOM CONTROL PANEL UI (pointer-events-none pada kontainer utama) -->
+        <!-- BOTTOM CONTROL PANEL UI -->
         <div class="absolute bottom-0 left-0 right-0 z-30 pb-8 pt-12 bg-gradient-to-t from-black via-black/80 to-transparent flex flex-col items-center gap-5 pointer-events-none">
             
             <div class="zoom-pill flex items-center p-1 gap-1 border border-white/10 pointer-events-auto">
@@ -57,8 +58,8 @@
                     <span class="text-xs text-white">🖼️</span>
                 </button>
 
-                <!-- TOMBOL SHUTTER DENGAN ONCLICK & ONTOUCHEND -->
-                <button id="shutter-btn" onclick="processPhotoWorkflow()" ontouchend="processPhotoWorkflow()" class="w-20 h-20 bg-white rounded-full border-4 border-zinc-400 active:scale-90 transition shadow-2xl flex items-center justify-center cursor-pointer z-50">
+                <!-- TOMBOL SHUTTER -->
+                <button id="shutter-btn" onclick="processPhotoWorkflow(event)" ontouchend="processPhotoWorkflow(event)" class="w-20 h-20 bg-white rounded-full border-4 border-zinc-400 active:scale-90 transition shadow-2xl flex items-center justify-center cursor-pointer z-50">
                     <div class="w-16 h-16 rounded-full border-2 border-black/10 pointer-events-none"></div>
                 </button>
 
@@ -159,14 +160,17 @@
         async function initCameraAndGps() {
             try {
                 if (videoTrack) { videoTrack.stop(); }
+
+                // Minta video rasio 16:9 alami
                 const stream = await navigator.mediaDevices.getUserMedia({ 
                     video: { 
                         facingMode: currentFacingMode, 
-                        width: { ideal: 1080, max: 1080 }, 
-                        height: { ideal: 1920, max: 1920 },
-                        aspectRatio: { ideal: 0.5625 } 
+                        width: { ideal: 1080 }, 
+                        height: { ideal: 1920 },
+                        aspectRatio: { ideal: 0.5625 } // 9:16
                     } 
                 });
+
                 const video = document.getElementById('webcam');
                 video.srcObject = stream;
                 videoTrack = stream.getVideoTracks()[0];
@@ -242,7 +246,7 @@
             }
         }
 
-        // --- ALUR FOTO AMAN DARI DOUBLE CLICK & HIT-TEST ISSUES ---
+        // --- ALUR PROSES AMBIL FOTO ---
         async function processPhotoWorkflow(e) {
             if (e) { e.preventDefault(); }
             if (isProcessing) return;
@@ -252,7 +256,6 @@
             const namaField = localStorage.getItem('workcam_nama') || "Heri Prasetyo";
 
             try {
-                // Flash Efek Layar
                 const video = document.getElementById('webcam');
                 video.classList.add('opacity-30');
                 setTimeout(() => video.classList.remove('opacity-30'), 150);
@@ -266,31 +269,23 @@
             }
         }
 
+        // --- RENDER GAMBAR RASIO 16:9 TANPA ROTASI PAKSA ---
         function createStampedImage(desc, nama) {
             return new Promise((resolve) => {
                 const video = document.getElementById('webcam');
                 const canvas = document.getElementById('canvas');
                 const ctx = canvas.getContext('2d');
 
-                let vW = video.videoWidth || 1080;
-                let vH = video.videoHeight || 1920;
-
+                // Kanvas ber-rasio 16:9 (1080 x 1920)
                 const targetW = 1080;
-                const targetH = 1440;
+                const targetH = 1920;
                 canvas.width = targetW;
                 canvas.height = targetH;
 
-                ctx.save();
-                if (vW > vH) {
-                    ctx.translate(targetW / 2, targetH / 2);
-                    ctx.rotate(90 * Math.PI / 180);
-                    ctx.drawImage(video, -targetH / 2, -targetW / 2, targetH, targetW);
-                } else {
-                    ctx.drawImage(video, 0, 0, targetW, targetH);
-                }
-                ctx.restore();
+                // Lukis langsung dari kamera tanpa diputar/di-rotasi (APA ADANYA)
+                ctx.drawImage(video, 0, 0, targetW, targetH);
 
-                // Watermark Card (Presisi Referensi)
+                // HOVER WATERMARK CARD (Sesuai Referensi Gambar)
                 const cardMargin = 40;
                 const cardW = targetW - (cardMargin * 2);
                 const cardH = 320;
@@ -312,6 +307,7 @@
                 }
                 ctx.restore();
 
+                // MAP MINI
                 const mapMargin = 25;
                 const mapSize = 130;
                 const mapX = cardX + mapMargin;
@@ -340,6 +336,7 @@
                 ctx.arc(mapX + 65, mapY + 50, 16, 0, Math.PI * 2);
                 ctx.fill();
 
+                // TEKS LOKASI
                 const textX = mapX + mapSize + 25;
                 let currentY = mapY + 20;
 
@@ -358,6 +355,7 @@
                 ctx.font = "22px sans-serif";
                 ctx.fillText(`Lat: ${safeCoords.split(',')[0]}, Long: ${safeCoords.split(',')[1] || ''}`, textX, currentY);
 
+                // GARIS SEPARATOR
                 const dividerY = mapY + mapSize + 20;
                 ctx.strokeStyle = "#f1f5f9";
                 ctx.lineWidth = 2;
@@ -366,6 +364,7 @@
                 ctx.lineTo(cardX + cardW - mapMargin, dividerY);
                 ctx.stroke();
 
+                // WAKTU & KOMPAS
                 const now = new Date();
                 const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
                 const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit', weekday: 'short' });
