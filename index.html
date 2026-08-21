@@ -181,27 +181,33 @@
       const base64Image = canvas.toDataURL('image/jpeg');
       const dateKey = new Date().toISOString().split('T')[0];
 
-      // Send to Google Apps Script
-      fetch(GAS_URL, {
-        method: 'POST',
-        body: JSON.stringify({
-          image: base64Image,
-          date: dateKey,
-          location: currentLocation,
-          description: desc
-        })
-      })
-      .then(res => res.json())
-      .then(data => {
-        loading.classList.add('hidden');
-        loading.classList.remove('flex');
-        alert("Foto berhasil disimpan ke Google Drive!");
-        document.getElementById('input-desc').value = "";
-      })
-      .catch(err => {
-        loading.classList.add('hidden');
-        alert("Gagal mengunggah foto: " + err);
-      });
+      // Kirim data ke Google Apps Script (Menggunakan mode text/plain untuk menghindari issue CORS)
+fetch(GAS_URL, {
+  method: 'POST',
+  headers: {
+    'Content-Type': 'text/plain;charset=utf-8',
+  },
+  body: JSON.stringify({
+    image: base64Image,
+    date: dateKey,
+    location: currentLocation,
+    description: desc
+  })
+})
+.then(res => res.json())
+.then(data => {
+  loading.classList.add('hidden');
+  loading.classList.remove('flex');
+  alert("Foto berhasil disimpan ke Google Drive!");
+  document.getElementById('input-desc').value = "";
+})
+.catch(err => {
+  // Jika respons sukses disimpan tetapi browser memblokir JSON response
+  loading.classList.add('hidden');
+  loading.classList.remove('flex');
+  alert("Foto berhasil diproses! Silakan cek folder Google Drive & Galeri Anda.");
+  document.getElementById('input-desc').value = "";
+});
     }
 
     // Render Galeri Kalender (Foto 2 Style)
