@@ -293,130 +293,160 @@
         }
 
         function createStampedImage(desc, nama) {
-            return new Promise((resolve) => {
-                const video = document.getElementById('webcam');
-                const canvas = document.getElementById('canvas');
-                const ctx = canvas.getContext('2d');
+    return new Promise((resolve, reject) => {
+        const video = document.getElementById('webcam');
+        const canvas = document.getElementById('canvas');
+        const ctx = canvas.getContext('2d');
 
-                const targetW = 1080;
-                const targetH = 1920;
-                canvas.width = targetW;
-                canvas.height = targetH;
-
-                // Menggambar langsung tanpa pemutaran kanvas manual
-                ctx.drawImage(video, 0, 0, targetW, targetH);
-
-                // Watermark Card Overlay
-                const cardMargin = 40;
-                const cardW = targetW - (cardMargin * 2);
-                const cardH = 320;
-                const cardX = cardMargin;
-                const cardY = targetH - cardH - 120;
-
-                ctx.save();
-                ctx.shadowColor = "rgba(0, 0, 0, 0.25)";
-                ctx.shadowBlur = 25;
-                ctx.shadowOffsetY = 10;
-                ctx.fillStyle = "#ffffff";
-                
-                if (ctx.roundRect) {
-                    ctx.beginPath();
-                    ctx.roundRect(cardX, cardY, cardW, cardH, 30);
-                    ctx.fill();
-                } else {
-                    ctx.fillRect(cardX, cardY, cardW, cardH);
-                }
-                ctx.restore();
-
-                const mapMargin = 25;
-                const mapSize = 130;
-                const mapX = cardX + mapMargin;
-                const mapY = cardY + mapMargin;
-
-                ctx.fillStyle = "#e5e7eb";
-                if (ctx.roundRect) {
-                    ctx.beginPath();
-                    ctx.roundRect(mapX, mapY, mapSize, mapSize, 20);
-                    ctx.fill();
-                } else {
-                    ctx.fillRect(mapX, mapY, mapSize, mapSize);
-                }
-
-                ctx.strokeStyle = "#ffffff";
-                ctx.lineWidth = 12;
-                ctx.beginPath();
-                ctx.moveTo(mapX, mapY + 65);
-                ctx.lineTo(mapX + mapSize, mapY + 65);
-                ctx.stroke();
-
-                ctx.fillStyle = "#ef4444";
-                ctx.beginPath();
-                ctx.arc(mapX + 65, mapY + 50, 16, 0, Math.PI * 2);
-                ctx.fill();
-
-                const textX = mapX + mapSize + 25;
-                let currentY = mapY + 20;
-
-                const safeAddress = currentAddress || "Lokasi tidak terdeteksi";
-                const safeCoords = currentCoords || "-6.9666, 110.4166";
-
-                ctx.fillStyle = "#0f172a";
-                ctx.font = "bold 28px sans-serif";
-                ctx.textBaseline = "top";
-                
-                const shortAddress = safeAddress.length > 30 ? safeAddress.substring(0, 30) + "..." : safeAddress;
-                ctx.fillText(shortAddress, textX, currentY);
-
-                currentY += 42;
-                ctx.fillStyle = "#64748b";
-                ctx.font = "22px sans-serif";
-                ctx.fillText(`Lat: ${safeCoords.split(',')[0]}, Long: ${safeCoords.split(',')[1] || ''}`, textX, currentY);
-
-                const dividerY = mapY + mapSize + 20;
-                ctx.strokeStyle = "#f1f5f9";
-                ctx.lineWidth = 2;
-                ctx.beginPath();
-                ctx.moveTo(cardX + mapMargin, dividerY);
-                ctx.lineTo(cardX + cardW - mapMargin, dividerY);
-                ctx.stroke();
-
-                const now = new Date();
-                const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
-                const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit', weekday: 'short' });
-
-                const col1X = cardX + mapMargin;
-                const col2X = cardX + (cardW / 2) + 10;
-                const bottomY = dividerY + 18;
-
-                ctx.fillStyle = "#2563eb";
-                ctx.beginPath();
-                ctx.arc(col1X + 20, bottomY + 20, 20, 0, Math.PI * 2);
-                ctx.fill();
-
-                ctx.fillStyle = "#2563eb";
-                ctx.font = "bold 30px sans-serif";
-                ctx.fillText(timeStr, col1X + 52, bottomY - 2);
-
-                ctx.fillStyle = "#64748b";
-                ctx.font = "18px sans-serif";
-                ctx.fillText(dateStr, col1X + 52, bottomY + 32);
-
-                ctx.fillStyle = "#2563eb";
-                ctx.beginPath();
-                ctx.arc(col2X + 20, bottomY + 20, 20, 0, Math.PI * 2);
-                ctx.fill();
-
-                ctx.fillStyle = "#2563eb";
-                ctx.font = "bold 30px sans-serif";
-                ctx.fillText("337°", col2X + 52, bottomY - 2);
-
-                ctx.fillStyle = "#64748b";
-                ctx.font = "18px sans-serif";
-                ctx.fillText("NorthEast", col2X + 52, bottomY + 32);
-
-                resolve(canvas.toDataURL('image/jpeg', 0.92));
-            });
+        if (!video || !video.srcObject) {
+            reject("Kamera tidak aktif");
+            return;
         }
+
+        // 1. Dapatkan resolusi asli bawaan dari sensor kamera HP
+        const vW = video.videoWidth || 1080;
+        const vH = video.videoHeight || 1920;
+
+        // 2. Tentukan ukuran canvas output (Portrait 1080x1920)
+        const targetW = 1080;
+        const targetH = 1920;
+        canvas.width = targetW;
+        canvas.height = targetH;
+
+        // 3. Kalkulasi CROP-TO-FILL (Proporsional tanpa stretch/gepeng)
+        const videoAspect = vW / vH;
+        const targetAspect = targetW / targetH;
+        
+        let drawWidth, drawHeight, offsetX, offsetY;
+
+        if (videoAspect > targetAspect) {
+            // Video lebih lebar dari kanvas
+            drawHeight = vH;
+            drawWidth = vH * targetAspect;
+            offsetX = (vW - drawWidth) / 2;
+            offsetY = 0;
+        } else {
+            // Video lebih tinggi dari kanvas
+            drawWidth = vW;
+            drawHeight = vW / targetAspect;
+            offsetX = 0;
+            offsetY = (vH - drawHeight) / 2;
+        }
+
+        // Gambar video ke canvas secara proporsional
+        ctx.drawImage(video, offsetX, offsetY, drawWidth, drawHeight, 0, 0, targetW, targetH);
+
+        // --- WATERMARK CARD OVERLAY ---
+        const cardMargin = 40;
+        const cardW = targetW - (cardMargin * 2);
+        const cardH = 320;
+        const cardX = cardMargin;
+        const cardY = targetH - cardH - 120;
+
+        ctx.save();
+        ctx.shadowColor = "rgba(0, 0, 0, 0.25)";
+        ctx.shadowBlur = 25;
+        ctx.shadowOffsetY = 10;
+        ctx.fillStyle = "#ffffff";
+        
+        if (ctx.roundRect) {
+            ctx.beginPath();
+            ctx.roundRect(cardX, cardY, cardW, cardH, 30);
+            ctx.fill();
+        } else {
+            ctx.fillRect(cardX, cardY, cardW, cardH);
+        }
+        ctx.restore();
+
+        const mapMargin = 25;
+        const mapSize = 130;
+        const mapX = cardX + mapMargin;
+        const mapY = cardY + mapMargin;
+
+        ctx.fillStyle = "#e5e7eb";
+        if (ctx.roundRect) {
+            ctx.beginPath();
+            ctx.roundRect(mapX, mapY, mapSize, mapSize, 20);
+            ctx.fill();
+        } else {
+            ctx.fillRect(mapX, mapY, mapSize, mapSize);
+        }
+
+        ctx.strokeStyle = "#ffffff";
+        ctx.lineWidth = 12;
+        ctx.beginPath();
+        ctx.moveTo(mapX, mapY + 65);
+        ctx.lineTo(mapX + mapSize, mapY + 65);
+        ctx.stroke();
+
+        ctx.fillStyle = "#ef4444";
+        ctx.beginPath();
+        ctx.arc(mapX + 65, mapY + 50, 16, 0, Math.PI * 2);
+        ctx.fill();
+
+        const textX = mapX + mapSize + 25;
+        let currentY = mapY + 20;
+
+        const safeAddress = currentAddress || "Lokasi tidak terdeteksi";
+        const safeCoords = currentCoords || "-6.954955, 110.379780";
+
+        ctx.fillStyle = "#0f172a";
+        ctx.font = "bold 28px sans-serif";
+        ctx.textBaseline = "top";
+        
+        const shortAddress = safeAddress.length > 30 ? safeAddress.substring(0, 30) + "..." : safeAddress;
+        ctx.fillText(shortAddress, textX, currentY);
+
+        currentY += 42;
+        ctx.fillStyle = "#64748b";
+        ctx.font = "22px sans-serif";
+        ctx.fillText(`Lat: ${safeCoords.split(',')[0]}, Long: ${safeCoords.split(',')[1] || ''}`, textX, currentY);
+
+        const dividerY = mapY + mapSize + 20;
+        ctx.strokeStyle = "#f1f5f9";
+        ctx.lineWidth = 2;
+        ctx.beginPath();
+        ctx.moveTo(cardX + mapMargin, dividerY);
+        ctx.lineTo(cardX + cardW - mapMargin, dividerY);
+        ctx.stroke();
+
+        const now = new Date();
+        const timeStr = now.toLocaleTimeString('en-US', { hour: '2-digit', minute: '2-digit', hour12: true });
+        const dateStr = now.toLocaleDateString('en-GB', { day: '2-digit', month: 'short', year: '2-digit', weekday: 'short' });
+
+        const col1X = cardX + mapMargin;
+        const col2X = cardX + (cardW / 2) + 10;
+        const bottomY = dividerY + 18;
+
+        ctx.fillStyle = "#2563eb";
+        ctx.beginPath();
+        ctx.arc(col1X + 20, bottomY + 20, 20, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#2563eb";
+        ctx.font = "bold 30px sans-serif";
+        ctx.fillText(timeStr, col1X + 52, bottomY - 2);
+
+        ctx.fillStyle = "#64748b";
+        ctx.font = "18px sans-serif";
+        ctx.fillText(dateStr, col1X + 52, bottomY + 32);
+
+        ctx.fillStyle = "#2563eb";
+        ctx.beginPath();
+        ctx.arc(col2X + 20, bottomY + 20, 20, 0, Math.PI * 2);
+        ctx.fill();
+
+        ctx.fillStyle = "#2563eb";
+        ctx.font = "bold 30px sans-serif";
+        ctx.fillText("337°", col2X + 52, bottomY - 2);
+
+        ctx.fillStyle = "#64748b";
+        ctx.font = "18px sans-serif";
+        ctx.fillText("NorthEast", col2X + 52, bottomY + 32);
+
+        resolve(canvas.toDataURL('image/jpeg', 0.92));
+    });
+}
 
         async function uploadPhotoToGas(base64Image, desc) {
             if (!GAS_URL) return;
